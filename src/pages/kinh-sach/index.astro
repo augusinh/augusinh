@@ -1,0 +1,704 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import indexData from '../../data/kinh-sach-index.json';
+import pageHeaders from '../../data/page-headers.json';
+const ph = (pageHeaders as Record<string, Record<string, string>>)['readings'];
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+
+// Trạng thái fill (build-time): body .md rỗng ⇒ chưa fill
+const KS_DIR = join(process.cwd(), 'src', 'content', 'kinh-sach');
+function readEntry(id: string): { filled: boolean; manualFill: boolean } {
+  const p = join(KS_DIR, ...id.split('/')) + '.md';
+  if (!existsSync(p)) return { filled: false, manualFill: false };
+  const raw = readFileSync(p, 'utf-8');
+  const parts = raw.split(/^---\s*$/m);
+  const fm = parts.length >= 2 ? parts[1] : '';
+  const body = parts.length >= 3 ? parts.slice(2).join('---') : '';
+  return {
+    filled: body.trim().length > 20,
+    manualFill: /^manualFill:\s*true\s*$/m.test(fm),
+  };
+}
+// Entry cần sửa metadata (highlight đỏ)
+const NEEDS_FIX = new Set<string>([
+  'mua-giang-sinh/tu-ngay-2-thang-1-den-le-hien-linh-thu-bay',
+]);
+for (const key of Object.keys(indexData as Record<string, any[]>)) {
+  for (const e of (indexData as Record<string, any[]>)[key]) {
+    const st = readEntry(e.id);
+    e.filled = st.filled;
+    if (st.manualFill) e.manualFill = true;
+    if (NEEDS_FIX.has(e.id)) e.needsFix = true;
+  }
+}
+
+const SEASONS = [
+  { key: 'le-chung', label: 'Lễ Chung' },
+  { key: 'le-rieng', label: 'Lễ Riêng' },
+  { key: 'trong-kinh-chua', label: 'Lễ Trọng Kính Chúa' },
+  { key: 'mua-thuong-nien', label: 'Mùa Thường Niên' },
+  { key: 'mua-vong', label: 'Mùa Vọng' },
+  { key: 'mua-giang-sinh', label: 'Mùa Giáng Sinh' },
+  { key: 'mua-chay', label: 'Mùa Chay' },
+  { key: 'mua-phuc-sinh', label: 'Mùa Phục Sinh' },
+];
+const present = SEASONS.filter((s) => (indexData[s.key] || []).length > 0);
+const SEASON_LABELS = Object.fromEntries(SEASONS.map((s) => [s.key, s.label]));
+---
+<BaseLayout title="Bài Đọc Kinh Sách" bodyClass="no-sidebar" banner="readings">
+  <script is:inline>document.body.dataset.noAutoscroll='1';</script>
+  <div class="listing">
+    <PageHeader
+      title={ph.title}
+      sub={ph.sub}
+      desc={ph.desc}
+    />
+
+    <!-- Bài đọc hôm nay (JS điền nội dung) -->
+    <div class="today-card" id="todayCard" style="display:none;"></div>
+
+    <!-- Chọn mùa — bar tab (giống thanh chọn quyển Tự Thuật) -->
+    <div class="season-filter" id="season-filter">
+      <div class="ks-season-bar" id="season-tabs" role="tablist" aria-label="Mùa phụng vụ">
+        <button type="button" class="ks-season-tab" data-key="__all__">Tất Cả</button>
+        {present.map((s) => (<button type="button" class="ks-season-tab" data-key={s.key}>{s.label}</button>))}
+      </div>
+    </div>
+
+    <!-- Tìm + lọc tác giả -->
+    <div class="listing-toolbar" id="toolbar" style="display:none;">
+      <div class="search-box">
+        <input type="search" id="searchInput" placeholder="Tìm theo bài lễ, tác giả, trích đoạn..." />
+      </div>
+      <select id="authorSelect" aria-label="Lọc theo tác giả"></select>
+      <label class="unfilled-toggle"><input type="checkbox" id="unfilledToggle" /> Chưa fill</label>
+    </div>
+
+    <p class="listing-count" id="count" style="display:none;"></p>
+
+    <!-- BẢNG INDEX giống bản gốc -->
+    <div id="tableWrap" style="display:none; overflow-x:auto;">
+      <table class="readings-table">
+        <thead>
+          <tr><th>Tác Giả</th><th>Trích Đoạn</th><th>Phụng Vụ</th></tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+
+    <p class="listing-hint" id="hint">Hãy chọn một mùa phụng vụ ở trên để xem bảng các bài đọc.</p>
+  </div>
+
+  <!-- Floating filter widget — thay thế #backBtn -->
+  <div id="floatFilterWidget">
+    <div id="floatFilterPanel">
+      <p class="ffp-label">Mùa</p>
+      <select id="floatSeasonSel"></select>
+      <div id="ffpWeekRow" class="ffp-week-hidden">
+        <p class="ffp-label">Tuần</p>
+        <select id="floatWeekSel"></select>
+      </div>
+      <p class="ffp-label">Tác Giả</p>
+      <select id="floatAuthorSel"></select>
+    </div>
+    <button id="floatFilterBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Bộ lọc">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 4h18l-7 8.5V20l-4-2V12.5Z"/></svg>
+      <span id="floatFilterLabel">Lọc</span>
+    </button>
+  </div>
+
+  <script set:html={`window.__KS_INDEX__ = ${JSON.stringify(indexData)}; window.__KS_SEASON_LABELS__ = ${JSON.stringify(SEASON_LABELS)}; window.__KS_SEASONS__ = ${JSON.stringify(present)};`}></script>
+  <script>
+    const INDEX = window.__KS_INDEX__ || {};
+    const SEASON_LABELS = window.__KS_SEASON_LABELS__ || {};
+    const els = {
+      season:  document.getElementById('season-tabs'),
+      filterBar: document.getElementById('season-filter'),
+      toolbar: document.getElementById('toolbar'),
+      search:  document.getElementById('searchInput'),
+      author:  document.getElementById('authorSelect'),
+      wrap:    document.getElementById('tableWrap'),
+      body:    document.getElementById('tableBody'),
+      hint:    document.getElementById('hint'),
+      count:   document.getElementById('count'),
+      today:   document.getElementById('todayCard'),
+      unfilled: document.getElementById('unfilledToggle'),
+    };
+    const floatWidget    = document.getElementById('floatFilterWidget');
+    const floatPanel     = document.getElementById('floatFilterPanel');
+    const floatSeasonSel = document.getElementById('floatSeasonSel');
+    const floatWeekSel   = document.getElementById('floatWeekSel');
+    const floatAuthorSel = document.getElementById('floatAuthorSel');
+    const floatBtn       = document.getElementById('floatFilterBtn');
+    const floatLabel     = document.getElementById('floatFilterLabel');
+    const SEASONS_LIST   = window.__KS_SEASONS__ || [];
+    const SEASONS_WITH_WEEKS = new Set(['mua-thuong-nien','mua-vong','mua-chay','mua-phuc-sinh']);
+    let current = null;
+    let weekFilter = 'all';
+    const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    // Bỏ phẩm trật/mô tả sau tên tác giả (Gm., Lm., Tđ., Ts. Hội Thánh, Giáo phụ, Vp....)
+    // Tên = phần trước dấu phẩy đầu tiên; mọi thứ sau đó là danh hiệu → bỏ.
+    const stripRankAbbr = (s) => String(s ?? '').replace(/\s*,[\s\S]*$/, '').trim();
+    // Viết đầy đủ các viết tắt phẩm trật trong cột Phụng Vụ
+    const RANK_FULL = { Gm:'Giám mục', Lm:'Linh mục', Vp:'Viện phụ', 'Tđ':'Tử đạo', Ts:'Tiến sĩ', Gh:'Giáo hoàng', Tn:'Trinh nữ', Nt:'Nữ tu' };
+    const expandRanks = (s) => String(s ?? '')
+      .replace(/(^|[\s,(])(Gm|Lm|Vp|Tđ|Ts|Gh|Tn|Nt)\./gu, (_, pre, ab) => pre + RANK_FULL[ab])
+      .replace(/(Giám mục|Linh mục|Viện phụ|Tử đạo|Tiến sĩ|Giáo hoàng|Trinh nữ|Nữ tu)(\s*,\s*\1)+/gu, '$1');
+    function extractWeek(liturgy) {
+      const s = liturgy || '';
+      if (/Tuần Bát Nhật/i.test(s)) return 'Tuần Bát Nhật';
+      if (/Lễ Tro/i.test(s)) return 'Lễ Tro';
+      const m1 = s.match(/Tuần\s+(\d+)/i);
+      if (m1) return `Tuần ${m1[1]}`;
+      const m2 = s.match(/Chúa Nhật\s+(\d+)/i);
+      if (m2) return `Tuần ${m2[1]}`;
+      return null;
+    }
+    function getWeeksForSeason(key) {
+      if (!key || key === '__all__' || !SEASONS_WITH_WEEKS.has(key)) return [];
+      const rows = INDEX[key] || [];
+      const seen = {};
+      rows.forEach(r => {
+        const w = extractWeek(r.liturgy || '');
+        if (w && !(w in seen)) {
+          const n = w.match(/\d+/);
+          seen[w] = n ? parseInt(n[0]) : (w.includes('Bát Nhật') ? 0 : -1);
+        }
+      });
+      return Object.keys(seen).sort((a, b) => seen[a] - seen[b]);
+    }
+
+    // ---- Floating filter helpers ----
+    function setFloatLabel() {
+      const parts = [];
+      if (current && current !== '__all__') {
+        const lbl = SEASON_LABELS[current] || current;
+        parts.push(lbl.split(' ').slice(0, 2).join(' '));
+      }
+      if (weekFilter && weekFilter !== 'all') {
+        parts.push(weekFilter.replace(/^Tuần (\d+)$/, 'T.$1').replace('Tuần Bát Nhật', 'Bát Nhật'));
+      }
+      const auth = els.author.value;
+      if (auth && auth !== 'all') {
+        const ws = auth.trim().split(/\s+/);
+        const s = ws[ws.length - 1];
+        parts.push(s.length > 10 ? s.slice(0, 10) + '…' : s);
+      }
+      floatLabel.textContent = parts.length ? parts.join(' · ') : 'Lọc';
+      floatBtn.classList.toggle('filtered', parts.length > 0);
+    }
+    function populateFloatSeasons() {
+      floatSeasonSel.innerHTML = [{ key: '__all__', label: 'Tất Cả' }, ...SEASONS_LIST]
+        .map(({ key, label }) => `<option value="${esc(key)}">${esc(label)}</option>`)
+        .join('');
+      floatSeasonSel.value = current || '__all__';
+    }
+    function populateFloatWeeks() {
+      const weekRow = document.getElementById('ffpWeekRow');
+      const weeks = getWeeksForSeason(current);
+      if (weeks.length === 0) {
+        weekRow.classList.add('ffp-week-hidden');
+        weekFilter = 'all';
+        floatWeekSel.innerHTML = '';
+        return;
+      }
+      weekRow.classList.remove('ffp-week-hidden');
+      floatWeekSel.innerHTML = `<option value="all">Tất cả tuần</option>` +
+        weeks.map(w => `<option value="${esc(w)}">${esc(w)}</option>`).join('');
+      floatWeekSel.value = weekFilter !== 'all' && weeks.includes(weekFilter) ? weekFilter : 'all';
+    }
+    function populateFloatAuthors() {
+      let rows = current === '__all__' ? getAllRows() : (INDEX[current] || []);
+      if (weekFilter && weekFilter !== 'all') rows = rows.filter(r => extractWeek(r.liturgy || '') === weekFilter);
+      const authors = [...new Set(rows.map((r) => stripRankAbbr(r.author)).filter(Boolean))].sort();
+      floatAuthorSel.innerHTML = `<option value="all">Tất cả tác giả</option>` +
+        authors.map((a) => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
+      floatAuthorSel.value = els.author.value || 'all';
+    }
+    function openPanel(open) {
+      if (open) { populateFloatSeasons(); populateFloatWeeks(); populateFloatAuthors(); }
+      floatPanel.classList.toggle('open', open);
+      floatBtn.setAttribute('aria-expanded', String(open));
+    }
+
+    // ---- Bài đọc hôm nay ----
+    // Build lookup: season → { liturgy_text → entry }
+    const LIT_MAP = {};
+    for (const [sk, entries] of Object.entries(INDEX)) {
+      LIT_MAP[sk] = Object.fromEntries(entries.map(e => [e.liturgy, e]));
+    }
+
+    async function getTodayEntry() {
+      const now = new Date();
+      const key = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+      const y   = now.getFullYear();
+      for (const ly of [y, y+1, y-1]) {
+        if (ly < 2020 || ly > 2100) continue;
+        try {
+          const r = await fetch(`/data/calendar/${ly}.json`);
+          if (!r.ok) continue;
+          const data = await r.json();
+          if (!data.days?.[key]) continue;
+          const dayData = data.days[key];
+          // Exact match bằng liturgy text
+          const entry = LIT_MAP[dayData.s]?.[dayData.l];
+          return { entry: entry || null, season: dayData.s, liturgy: dayData.l, cycle: data.cycle };
+        } catch { continue; }
+      }
+      return null;
+    }
+
+    async function renderTodayCard() {
+      const now    = new Date();
+      const todayD = now.getDate(), todayM = now.getMonth() + 1;
+      const todayFeasts = (INDEX['le-rieng'] || []).filter(e => {
+        const prefix = (e.liturgy || '').split(':')[0];
+        const nums = prefix.match(/\d+/g) || [];
+        return nums.length >= 2 && +nums[0] === todayD && +nums[1] === todayM;
+      });
+
+      const calData     = await getTodayEntry();
+      const primary     = calData?.entry || null;
+      const cycleLetter = calData?.cycle || '?';
+      if (!calData && !todayFeasts.length) return;
+
+      const SEASON_COLORS = {
+        'mua-vong':'#b499d8','mua-giang-sinh':'#e9c176','mua-thuong-nien':'#72c49a',
+        'mua-chay':'#a882c8','mua-phuc-sinh':'#f2d960','le-chung':'#d0c9be',
+        'le-rieng':'#e08888','trong-kinh-chua':'#8b2020',
+      };
+      const RANK_CHIPS = {
+        solemn:        { label:'T', cls:'td-chip td-chip-solemn' },
+        feast:         { label:'K', cls:'td-chip td-chip-feast' },
+        memorial:      { label:'N', cls:'td-chip td-chip-memorial' },
+        'opt-memorial':{ label:'n', cls:'td-chip td-chip-opt-memorial' },
+      };
+      const RANK_LABELS = {
+        solemn:'Lễ Trọng', feast:'Lễ Kính', memorial:'Lễ Nhớ Buộc', 'opt-memorial':'Lễ Nhớ Tùy Chọn',
+      };
+
+      const stripeColor = SEASON_COLORS[calData?.season] || '#e9c176';
+      const dateStr = now.toLocaleDateString('vi-VN', { weekday:'long', day:'numeric', month:'long' });
+
+      // Chip bậc lễ bài chính (chỉ hiện khi trong-kinh-chua / le-chung có rank)
+      let chipRowHtml = '';
+      if (primary?.rank && RANK_CHIPS[primary.rank] &&
+          (calData?.season === 'trong-kinh-chua' || calData?.season === 'le-chung')) {
+        const chip = RANK_CHIPS[primary.rank];
+        chipRowHtml = `<div class="td-chip-row"><span class="${chip.cls}">${chip.label}</span><span class="td-rank-label">${RANK_LABELS[primary.rank]}</span></div>`;
+      }
+
+      // Bài chính: liturgy text (từ entry hoặc từ calendar nếu chưa có entry)
+      const liturgyText = primary?.liturgy || calData?.liturgy || '';
+      const primaryUrl  = primary?.url || null;
+
+      // Lễ riêng: từng hàng compact (chip + tên), tất cả lễ trong ngày
+      let feastsHtml = '';
+      const readings = [];
+      if (primaryUrl) readings.push({ label: liturgyText, url: primaryUrl });
+      for (const e of todayFeasts) {
+        const ci = (e.liturgy || '').indexOf(':');
+        const fname = ci >= 0 ? e.liturgy.slice(ci + 1).trim() : e.liturgy;
+        const chip = RANK_CHIPS[e.rank];
+        feastsHtml += `<div class="td-feast-row">${chip ? `<span class="${chip.cls}">${chip.label}</span>` : ''}<span class="td-feast-name">${esc(fname)}</span></div>`;
+        readings.push({ label: (chip ? `[${chip.label}] ` : '') + fname, url: e.url || '/kinh-sach/?category=le-rieng' });
+      }
+
+      // Nút đọc — góc phải dưới
+      const ARROW = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+      let readBarHtml = '';
+      if (readings.length > 1) {
+        const opts = readings.map(r => `<option value="${esc(r.url)}">${esc(r.label)}</option>`).join('');
+        readBarHtml = `<select class="td-select" id="todaySelect">${opts}</select><a href="${esc(readings[0].url)}" class="td-read-btn" id="todayReadLink" title="Đọc Kinh Sách">${ARROW}</a>`;
+      } else if (readings.length === 1) {
+        readBarHtml = `<a href="${esc(readings[0].url)}" class="td-read-btn" title="Đọc Kinh Sách">${ARROW}</a>`;
+      }
+
+      els.today.innerHTML = `
+        <div class="today-inner">
+          <div class="td-stripe" style="background:${stripeColor}"></div>
+          <div class="td-body">
+            <div class="td-header-label">Hôm Nay</div>
+            <div class="td-date">${esc(dateStr)}<span class="td-cycle"> · Năm ${esc(cycleLetter)}</span></div>
+            ${chipRowHtml}
+            ${liturgyText ? `<div class="td-liturgy">${esc(liturgyText)}</div>` : ''}
+            ${feastsHtml}
+            <div class="td-read-bar">${readBarHtml}</div>
+          </div>
+        </div>`;
+      els.today.style.display = 'block';
+
+      const sel = document.getElementById('todaySelect');
+      const lnk = document.getElementById('todayReadLink');
+      if (sel && lnk) sel.addEventListener('change', () => { lnk.href = sel.value; });
+    }
+    const _todayReady = renderTodayCard(); // giữ promise để scroll đợi layout ổn định
+
+    // ---- Bảng index ----
+    function render(rows) {
+      if (!rows.length) {
+        els.body.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:3rem;color:var(--ink-cream-soft);font-style:italic;">Không tìm thấy bài nào phù hợp.</td></tr>';
+        els.count.textContent = '';
+        return;
+      }
+      els.count.textContent = `${rows.length} bài đọc`;
+      const HIGHLIGHT_AUTHORS = /augustin|fulgentius/i;
+      const VALID_RANKS = new Set(['solemn','feast','memorial','opt-memorial']);
+      const nUnfilled = rows.filter((r) => !r.filled).length;
+      if (nUnfilled) els.count.textContent = `${rows.length} bài đọc · ${nUnfilled} chưa fill`;
+      els.body.innerHTML = rows.map((r) => {
+        const hiAuthor = HIGHLIGHT_AUTHORS.test(r.author || '');
+        const rankCls = VALID_RANKS.has(r.rank) ? ` rank-${r.rank}` : '';
+        const cls = [
+          hiAuthor ? 'row-author-hi' : '',
+          r.needsFix ? 'row-needs-fix' : '',
+          !r.filled ? 'row-unfilled' : '',
+          rankCls.trim(),
+        ].filter(Boolean).join(' ');
+        const manualTag = r.manualFill ? ' <span class="tag-manual">fill tay</span>' : '';
+        return `<tr data-url="${r.url}" data-id="${r.id}"${cls ? ` class="${cls}"` : ''}>
+          <td>${esc(stripRankAbbr(r.author))}</td>
+          <td>${esc(r.excerpt)}</td>
+          <td><span class="ks-liturgy-txt">${esc(expandRanks(r.liturgy))}</span>${manualTag}<button type="button" class="row-edit-btn" data-id="${r.id}" title="Sửa / fill tay">✎</button></td>
+        </tr>`;
+      }).join('');
+    }
+    function populateAuthors(rows) {
+      const authors = [...new Set(rows.map((r) => stripRankAbbr(r.author)).filter(Boolean))].sort();
+      els.author.innerHTML = '<option value="all">Tất cả tác giả</option>' +
+        authors.map((a) => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
+    }
+    function getAllRows() {
+      return Object.values(INDEX).flat();
+    }
+    function apply() {
+      let rows = current === '__all__' ? getAllRows() : (INDEX[current] || []);
+      if (weekFilter && weekFilter !== 'all') rows = rows.filter(r => extractWeek(r.liturgy || '') === weekFilter);
+      const a = els.author.value;
+      if (a && a !== 'all') rows = rows.filter((r) => stripRankAbbr(r.author) === a);
+      const t = (els.search.value || '').toLowerCase().trim();
+      if (t) rows = rows.filter((r) =>
+        (r.author||'').toLowerCase().includes(t) ||
+        (r.excerpt||'').toLowerCase().includes(t) ||
+        (r.liturgy||'').toLowerCase().includes(t));
+      if (els.unfilled && els.unfilled.checked) rows = rows.filter((r) => !r.filled || r.needsFix);
+      render(rows);
+    }
+    function selectSeason(cat, push = true) {
+      current = cat;
+      if (els.season) els.season.querySelectorAll('.ks-season-tab').forEach((b) => b.classList.toggle('active', b.dataset.key === cat));
+      els.toolbar.style.display = 'flex';
+      els.count.style.display = 'block';
+      els.wrap.style.display = 'block';
+      els.hint.style.display = 'none';
+      weekFilter = 'all';
+      populateAuthors(cat === '__all__' ? getAllRows() : (INDEX[cat] || []));
+      els.author.value = 'all';
+      els.search.value = '';
+      apply();
+      setFloatLabel();
+      if (push) {
+        const url = new URL(location.href);
+        url.searchParams.set('category', cat);
+        url.searchParams.delete('author');
+        history.pushState({ category: cat }, '', url.toString());
+      }
+    }
+    function scrollToTable() {
+      // Ưu tiên today panel (nếu đã render); fallback về season-tabs
+      const todayEl = document.getElementById('todayCard');
+      const target = (todayEl && todayEl.style.display !== 'none')
+        ? todayEl
+        : document.getElementById('season-filter');
+      if (!target) return;
+      const navH = 64;
+      const y = target.getBoundingClientRect().top + window.scrollY - navH - 12;
+      window.scrollTo({ top: Math.max(0, y), behavior: 'instant' });
+    }
+    els.season.addEventListener('click', (e) => {
+      const tab = e.target.closest('.ks-season-tab');
+      if (!tab) return;
+      selectSeason(tab.dataset.key);
+      openPanel(false);
+      // View ngay tại dòng đầu tiên của mùa: đưa đầu khối kết quả về ngay dưới cụm sticky
+      const sf = document.getElementById('season-filter');
+      const tb = document.getElementById('toolbar');
+      const count = document.getElementById('count');
+      const tableWrap = document.getElementById('tableWrap');
+      const target = (count && count.style.display !== 'none') ? count : tableWrap;
+      if (!target) return;
+      const stack = 70 + (sf?.offsetHeight || 0) + (tb?.offsetHeight || 0);
+      const y = target.getBoundingClientRect().top + window.scrollY - stack - 6;
+      window.scrollTo({ top: Math.max(0, y), behavior: 'instant' });
+    });
+    els.author.addEventListener('change', () => {
+      setFloatLabel();
+      apply();
+      const url = new URL(location.href);
+      if (els.author.value !== 'all') url.searchParams.set('author', els.author.value);
+      else url.searchParams.delete('author');
+      history.replaceState({}, '', url.toString());
+    });
+    els.search.addEventListener('input', apply);
+    if (els.unfilled) els.unfilled.addEventListener('change', apply);
+    els.body.addEventListener('click', (e) => {
+      const editBtn = e.target.closest('.row-edit-btn');
+      if (editBtn) {
+        e.stopPropagation();
+        const id = editBtn.dataset.id;
+        window.open(`/admin/?id=${encodeURIComponent(id)}&manual=1`, '_blank');
+        return;
+      }
+      const tr = e.target.closest('tr');
+      if (tr && tr.dataset.url) {
+        sessionStorage.setItem('ks-last', tr.dataset.url);
+        sessionStorage.setItem('ks-scroll', String(window.scrollY));
+        window.location.href = tr.dataset.url;
+      }
+    });
+
+    // Nút edit chỉ hiện khi admin-server (localhost:4322) đang chạy
+    fetch('http://localhost:4322/api/entries', { signal: AbortSignal.timeout(2000) })
+      .then((r) => { if (r.ok) document.body.dataset.ksAdmin = '1'; })
+      .catch(() => {});
+
+    // ---- Float filter events ----
+    floatBtn.addEventListener('click', () => openPanel(!floatPanel.classList.contains('open')));
+    document.addEventListener('click', (e) => {
+      if (!floatWidget.contains(e.target)) openPanel(false);
+    }, { capture: true });
+    floatSeasonSel.addEventListener('change', () => {
+      const key = floatSeasonSel.value;
+      if (key !== current) selectSeason(key); // selectSeason resets weekFilter
+      populateFloatWeeks();
+      populateFloatAuthors();
+    });
+    floatWeekSel.addEventListener('change', () => {
+      weekFilter = floatWeekSel.value;
+      els.author.value = 'all';
+      populateFloatAuthors();
+      apply();
+      setFloatLabel();
+    });
+    floatAuthorSel.addEventListener('change', () => {
+      els.author.value = floatAuthorSel.value;
+      els.author.dispatchEvent(new Event('change'));
+    });
+    function highlightRow(url) {
+      if (url) {
+        for (const r of els.body.querySelectorAll('tr[data-url]')) {
+          if (r.dataset.url === url) {
+            sessionStorage.removeItem('ks-last');
+            r.classList.add('row-highlight');
+            r.addEventListener('animationend', () => r.classList.remove('row-highlight'), { once: true });
+            break;
+          }
+        }
+      }
+      // Khôi phục đúng vị trí đã rời đi (khi quay lại từ trang bài đọc); nếu không có → về đầu bảng
+      const savedY = sessionStorage.getItem('ks-scroll');
+      if (savedY !== null) {
+        sessionStorage.removeItem('ks-scroll');
+        window.scrollTo({ top: parseInt(savedY, 10) || 0, behavior: 'instant' });
+      } else {
+        scrollToTable();
+      }
+    }
+    function fromUrl(scroll = true) {
+      const p   = new URLSearchParams(location.search);
+      const cat = p.get('category') || '__all__'; // mặc định: hiện tất cả
+      if (cat === '__all__' || INDEX[cat]) {
+        selectSeason(cat, false);
+        const a = p.get('author');
+        if (a) { els.author.value = a; apply(); setFloatLabel(); }
+        if (scroll) {
+          // Đợi async today-card xong để layout ổn định rồi mới scroll
+          _todayReady.finally(() => highlightRow(sessionStorage.getItem('ks-last')));
+        }
+      }
+    }
+    // Ẩn backBtn của BaseLayout, dùng float filter thay thế
+    document.getElementById('backBtn')?.remove();
+    window.addEventListener('scroll', () => {
+      floatWidget.classList.toggle('show', window.scrollY > 300 && current !== null);
+    });
+    window.addEventListener('popstate', () => fromUrl(true));
+    // Khôi phục từ bfcache (back-link dùng history.back) → đồng bộ lại bộ lọc theo URL
+    window.addEventListener('pageshow', (e) => { if (e.persisted) fromUrl(true); });
+    // Load lần đầu:
+    //  - Có deep-link ?category → cuộn xuống bảng (đúng như link chia sẻ / quay lại từ bài đọc)
+    //  - Vào trang bình thường → hiển thị ngay masthead lib (bỏ qua banner)
+    if (new URLSearchParams(location.search).has('category')) {
+      fromUrl(true);
+    } else {
+      sessionStorage.removeItem('ks-scroll');
+      fromUrl(false);
+      const mh = document.querySelector('.lib-masthead');
+      if (mh) window.scrollTo({ top: Math.max(0, mh.getBoundingClientRect().top + window.scrollY - 70), behavior: 'instant' });
+    }
+  </script>
+</BaseLayout>
+
+<style is:global>
+/* ---- Panel Bài Đọc Hôm Nay (thiết kế mới đồng bộ lịch phụng vụ) ---- */
+.today-inner { padding: 0; } /* override listings.css */
+.td-stripe { height: 4px; width: 100%; transition: background .4s; }
+.td-body {
+  padding: 1.4rem 1.8rem 1.2rem;
+  display: flex; flex-direction: column; min-height: 8rem;
+}
+.td-header-label {
+  font-family: 'Be Vietnam Pro', sans-serif; font-size: 1.1rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .12rem; color: #c5a059; margin-bottom: .3rem;
+}
+.td-date {
+  font-family: 'Be Vietnam Pro', sans-serif; font-size: 1.55rem;
+  color: #d4ad4a; font-weight: 700; line-height: 1.25; margin-bottom: .8rem;
+}
+.td-cycle { font-size: 1.25rem; font-weight: 400; color: #c9bfa9; }
+.td-chip-row { display: flex; align-items: center; gap: .55rem; margin-bottom: .5rem; }
+.td-rank-label { font-family: 'Be Vietnam Pro', sans-serif; font-size: 1.3rem; color: #c9bfa9; font-weight: 600; }
+.td-chip {
+  display: inline-block; font-family: 'Be Vietnam Pro', sans-serif;
+  font-size: 1rem; font-weight: 800; line-height: 1.5;
+  padding: 0 .4rem; border-radius: 3px; flex-shrink: 0; letter-spacing: .01rem;
+}
+.td-chip-solemn        { background: #8b2020; color: #efe7d6; }
+.td-chip-feast         { background: #e9c176; color: #0d1f2b; }
+.td-chip-memorial      { background: #ccc8c0; color: #0d1f2b; }
+.td-chip-opt-memorial  { background: #a8a4a0; color: #0d1f2b; }
+.td-liturgy {
+  font-family: 'Merriweather', Georgia, serif; font-size: 1.5rem;
+  color: #efe7d6; line-height: 1.55; margin-bottom: .7rem;
+}
+.td-feast-row { display: flex; align-items: center; gap: .5rem; margin-bottom: .55rem; }
+.td-feast-name { font-family: 'Be Vietnam Pro', sans-serif; font-size: 1.35rem; color: #c9bfa9; line-height: 1.4; }
+.td-read-bar {
+  display: flex; align-items: center; justify-content: flex-end;
+  gap: .5rem; margin-top: auto; padding-top: .9rem;
+}
+.td-select {
+  flex: 1; background: rgba(255,255,255,.05);
+  border: 1px solid rgba(233,193,118,.22); border-radius: 8px;
+  color: #c9bfa9; font-family: 'Be Vietnam Pro', sans-serif; font-size: 1.25rem;
+  padding: .45rem 2.4rem .45rem .75rem; cursor: pointer; outline: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='7' viewBox='0 0 11 7'%3E%3Cpath d='M1 1l4.5 4.5L10 1' stroke='%23c5a059' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right .75rem center; min-width: 0;
+}
+.td-select:focus { border-color: rgba(233,193,118,.5); background-color: rgba(255,255,255,.05); }
+.td-select option { background: #1a2a4a; color: #efe7d6; }
+/* Firefox: gradient trick để ghi đè màu highlight mặc định của option:checked */
+.td-select option:checked { background: #1a2a4a linear-gradient(0deg,#1a2a4a 0%,#1a2a4a 100%); color: #e9c176; }
+.td-read-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 3rem; height: 3rem; border-radius: 50%;
+  border: 1px solid rgba(233,193,118,.3); background: transparent;
+  color: #e9c176; text-decoration: none; flex-shrink: 0;
+  transition: background .2s, border-color .2s;
+}
+.td-read-btn:hover { background: rgba(233,193,118,.12); border-color: #e9c176; }
+
+/* ---- Floating filter widget ---- */
+#floatFilterWidget {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 7.6rem;
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s ease;
+}
+#floatFilterWidget.show { opacity: 1; pointer-events: auto; }
+
+/* Trigger pill button */
+#floatFilterBtn {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .5rem 1.1rem;
+  background: rgba(16, 27, 51, 0.94);
+  border: 1px solid rgba(233, 196, 106, 0.35);
+  border-radius: 20px;
+  color: #e9c176;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 .4rem 1rem rgba(0,0,0,.35);
+  transition: border-color .2s, box-shadow .2s, background .2s;
+}
+#floatFilterBtn:hover,
+#floatFilterBtn[aria-expanded="true"] {
+  border-color: rgba(233, 196, 106, 0.65);
+  box-shadow: 0 .6rem 1.4rem rgba(0,0,0,.45);
+  background: rgba(22, 34, 61, 0.97);
+}
+#floatFilterBtn.filtered { border-color: rgba(233, 196, 106, 0.6); color: #f0d080; }
+
+/* Panel — appears above button via JS class */
+#floatFilterPanel {
+  position: absolute;
+  bottom: calc(100% + .55rem);
+  right: 0;
+  width: 18rem;
+  background: rgba(13, 20, 40, 0.97);
+  border: 1px solid rgba(233, 196, 106, 0.2);
+  border-radius: 10px;
+  box-shadow: 0 .6rem 2rem rgba(0,0,0,.6);
+  overflow: hidden;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity .18s ease, transform .18s ease, visibility 0s linear .18s;
+  pointer-events: none;
+}
+#floatFilterPanel.open {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0s;
+  pointer-events: auto;
+}
+
+/* Label trên mỗi select */
+.ffp-label {
+  margin: .6rem .8rem .2rem;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  font-size: .95rem;
+  font-weight: 700;
+  letter-spacing: .06rem;
+  text-transform: uppercase;
+  color: rgba(233, 193, 118, 0.5);
+}
+.ffp-label:first-child { margin-top: .7rem; }
+
+/* Tuần row — ẩn khi mùa không có cấu trúc tuần */
+#ffpWeekRow.ffp-week-hidden { display: none; }
+
+/* Select boxes trong panel */
+#floatSeasonSel, #floatWeekSel, #floatAuthorSel {
+  display: block;
+  width: calc(100% - 1.6rem);
+  margin: 0 .8rem .7rem;
+  padding: .35rem .5rem;
+  background: rgba(22, 34, 61, 0.95);
+  border: 1px solid rgba(233, 196, 106, 0.22);
+  border-radius: 6px;
+  color: #efe7d6;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  font-size: 1.2rem;
+  cursor: pointer;
+  outline: none;
+}
+#floatSeasonSel:focus, #floatWeekSel:focus, #floatAuthorSel:focus {
+  border-color: rgba(233, 196, 106, 0.5);
+}
+#floatSeasonSel option, #floatWeekSel option, #floatAuthorSel option {
+  background: #0d1628;
+  color: #efe7d6;
+}
+</style>

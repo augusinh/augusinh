@@ -1,0 +1,836 @@
+﻿---
+import { getEntry, getCollection, render } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+// Metadata từ sach collection
+const meta = await getEntry('sach', 'st-augustine/tu-thuat');
+if (!meta) return Astro.redirect('/404');
+
+// Bio pre-render server-side (hiển thị mặc định)
+const bioEntry = await getEntry('tu-thuat', 'bio');
+if (!bioEntry) return Astro.redirect('/404');
+const { Content: DefaultContent } = await render(bioEntry);
+
+// Danh sách 13 quyển để render tabs + fragment slugs
+const allChapters = (await getCollection('tu-thuat', (e) => !e.data.draft && e.id !== 'bio'))
+  .sort((a, b) => a.data.order - b.data.order);
+---
+<BaseLayout
+  title={meta.data.title}
+  description={meta.data.excerpt}
+  type="article"
+  banner="tu-thuat"
+  bodyClass="no-sidebar page-tu-thuat"
+>
+
+<!-- ── Masthead ── -->
+<header class="lib-masthead">
+  <p class="lib-masthead-sub">{meta.data.author} · Confessiones · 397–400</p>
+  <h1 class="lib-masthead-title">{meta.data.title}</h1>
+  <div class="lib-masthead-rule"><span class="lib-masthead-ornament">✦</span></div>
+  <p class="lib-masthead-article-meta">
+    {meta.data.translator && <span>Dịch: {meta.data.translator}</span>}
+  </p>
+</header>
+
+<!-- ── Book selector (sticky below navbar) ── -->
+<nav class="tt-book-nav" aria-label="Chọn quyển">
+  <div class="tt-book-nav-inner">
+    {allChapters.map((ch, i) => (
+      <button
+        type="button"
+        class="tt-book-tab"
+        data-fragment-slug={ch.id}
+      >
+        {`Quyển ${i + 1}`}
+      </button>
+    ))}
+    {allChapters.length < 13 && Array.from({length: 13 - allChapters.length}, (_, i) => (
+      <span class="tt-book-tab tt-book-tab--empty" aria-disabled="true">
+        {`Quyển ${allChapters.length + i + 1}`}
+      </span>
+    ))}
+  </div>
+</nav>
+
+<!-- ── Reading progress bar ── -->
+<div id="tt-progress" aria-hidden="true"><div id="tt-progress-bar"></div></div>
+
+<!-- ── Content ── -->
+<div class="article-shell has-toc toc-open">
+  <nav class="toc" aria-label="Mục lục">
+    <button class="toc-trigger" type="button" aria-expanded="true">
+      <svg class="toc-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 18l6-6-6-6"/>
+      </svg>
+    </button>
+    <div class="toc-drawer">
+      <div class="toc-drawer-head">
+        <p class="toc-title">Mục lục</p>
+      </div>
+      <ul id="tt-toc-list"></ul>
+    </div>
+  </nav>
+  <div id="tt-chapter-wrap">
+    <article id="tt-chapter-content" class="prose tt-prose" data-content-slug="bio">
+      <DefaultContent />
+    </article>
+    <div id="tt-chapter-loading" hidden aria-live="polite">
+      <span class="tt-loading-dot"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ── TOC list toggle (mục lục nhanh) ── -->
+<div id="docFloatToc">
+  <div id="dftPanel">
+    <p class="ffp-label">Mục Lục</p>
+    <nav id="dftNav" aria-label="Mục lục chương"></nav>
+  </div>
+  <button id="dftBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Mục lục">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <line x1="3" y1="6" x2="21" y2="6"/>
+      <line x1="3" y1="12" x2="16" y2="12"/>
+      <line x1="3" y1="18" x2="11" y2="18"/>
+    </svg>
+    <span id="dftLabel">Mục Lục</span>
+  </button>
+</div>
+
+<!-- ── Filter Quyển → Chương → Đoạn ── -->
+<div id="ttFilter">
+  <div id="ttFilterPanel">
+    <p class="ffp-label">Quyển</p>
+    <select id="ttSelQuyen" class="tt-filter-sel" aria-label="Chọn quyển"></select>
+    <p class="ffp-label">Đoạn</p>
+    <select id="ttSelDoan" class="tt-filter-sel" aria-label="Chọn đoạn"></select>
+    <p class="ffp-label">Số đoạn</p>
+    <select id="ttSelSo" class="tt-filter-sel" aria-label="Chọn số đoạn"></select>
+  </div>
+  <button id="ttFilterBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Lọc Quyển / Chương / Đoạn">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <line x1="4" y1="6" x2="20" y2="6"/>
+      <line x1="7" y1="12" x2="17" y2="12"/>
+      <line x1="10" y1="18" x2="14" y2="18"/>
+    </svg>
+    <span>Lọc đoạn</span>
+  </button>
+</div>
+
+</BaseLayout>
+
+<style>
+/* ── Book selector — sticky dưới navbar ── */
+.tt-book-nav {
+  position: sticky;
+  /* Sát ngay dưới navbar (cao 6.93rem) — không để khe hở lộ nội dung cuộn phía sau.
+     Phân biệt với navbar bằng nền --bg-card + viền + đổ bóng bên dưới. */
+  top: 6.93rem;
+  z-index: 100;
+  /* Break out of main.content padding (#main > .content applies 4rem ngang, home-layout.css) */
+  margin-left: -4rem;
+  margin-right: -4rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  /* Nền card + viền vàng trên/dưới để tách bạch với navbar (navbar dùng --bg-main) khi scroll */
+  background: var(--bg-card);
+  border-top: 1px solid rgba(233,193,118,0.12);
+  border-bottom: 1px solid rgba(233,193,118,0.28);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.45);
+}
+.tt-book-nav::-webkit-scrollbar { display: none; }
+.tt-book-nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0;
+  padding: 0 1.4rem;
+}
+/* right padding trong overflow-x container bị browsers bỏ qua — dùng spacer */
+.tt-book-nav-inner::after {
+  content: '';
+  display: block;
+  flex-shrink: 0;
+  min-width: 0;
+}
+.tt-book-tab {
+  font-family: 'Be Vietnam Pro', 'Manrope', system-ui, sans-serif;
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  color: var(--ink-cream-soft);
+  background: transparent;
+  border: none;
+  padding: 1.1rem 0.9rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.2s;
+}
+.tt-book-tab::after {
+  content: '';
+  position: absolute;
+  bottom: -1px; left: 0; right: 0;
+  height: 2px;
+  background: var(--gold);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.25s ease;
+}
+.tt-book-tab.active {
+  color: var(--ink-cream);
+}
+.tt-book-tab.active::after { transform: scaleX(1); }
+.tt-book-tab:hover:not(.active):not(.tt-book-tab--empty) {
+  color: var(--ink-cream);
+}
+.tt-book-tab--empty {
+  color: rgba(239,231,214,0.18);
+  cursor: default;
+  pointer-events: none;
+}
+.tt-book-tab--empty::after { display: none; }
+
+/* ── Khoảng cách giữa book nav và content ── */
+.article-shell { margin-top: 2rem; }
+
+/* ── Chapter content transition ── */
+#tt-chapter-content { transition: opacity 0.2s ease; }
+#tt-chapter-loading:not([hidden]) {
+  display: flex;
+  justify-content: center;
+  padding: 3rem;
+}
+.tt-loading-dot {
+  width: 2.4rem; height: 2.4rem;
+  border-radius: 50%;
+  border: 2px solid rgba(233,193,118,0.18);
+  border-top-color: var(--gold);
+  animation: tt-spin 0.8s linear infinite;
+}
+@keyframes tt-spin { to { transform: rotate(360deg); } }
+</style>
+
+
+<style is:global>
+/* ── Light mode ── */
+[data-theme="light"] body.page-tu-thuat .tt-book-nav {
+  background: var(--bg-card);
+  border-top-color: rgba(26,94,60,0.18);
+  border-bottom-color: rgba(26,94,60,0.42);
+  box-shadow: 0 6px 18px rgba(26,94,60,0.16);
+}
+[data-theme="light"] body.page-tu-thuat .tt-loading-dot {
+  border-color: rgba(26,94,60,0.15);
+  border-top-color: #1a5e3c;
+}
+/* Chữ đậm hơn để dễ đọc trên nền sáng (trước đây 0.52 quá mờ) */
+[data-theme="light"] body.page-tu-thuat .tt-book-tab { color: rgba(42,30,16,0.78); }
+[data-theme="light"] body.page-tu-thuat .tt-book-tab.active { color: #1a5e3c; border-bottom-color: #1a5e3c; }
+[data-theme="light"] body.page-tu-thuat .tt-book-tab:hover:not(.active):not(.tt-book-tab--empty) { color: #1a5e3c; }
+[data-theme="light"] body.page-tu-thuat .tt-book-tab--empty { color: rgba(42,30,16,0.3); }
+
+/* ── Filter widget: Quyển / Đoạn / Số đoạn (nổi trên nút Mục Lục) ── */
+#ttFilter {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 11rem;
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s ease;
+}
+#ttFilter.show { opacity: 1; pointer-events: auto; }
+#ttFilterBtn {
+  display: flex; align-items: center; gap: .45rem;
+  padding: .5rem 1.1rem;
+  background: rgba(16,27,51,0.94);
+  border: 1px solid rgba(233,196,106,0.35);
+  border-radius: 20px;
+  color: #e9c176;
+  font-family: var(--font-ui);
+  font-size: 1.25rem; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+  box-shadow: 0 .4rem 1rem rgba(0,0,0,.35);
+  transition: background .18s, border-color .18s, box-shadow .18s;
+}
+#ttFilterBtn:hover,
+#ttFilterBtn[aria-expanded="true"] {
+  background: rgba(16,27,51,0.98);
+  border-color: rgba(233,196,106,0.7);
+  box-shadow: 0 .6rem 1.4rem rgba(0,0,0,.4);
+}
+#ttFilterPanel {
+  display: none;
+  flex-direction: column;
+  position: absolute;
+  bottom: calc(100% + .8rem);
+  right: 0;
+  width: 24rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  background: rgba(16,24,45,0.97);
+  border: 1px solid rgba(233,193,118,0.18);
+  border-radius: 12px;
+  box-shadow: 0 .8rem 2.4rem rgba(0,0,0,.5);
+  padding-bottom: .8rem;
+}
+#ttFilterPanel.open { display: flex; }
+.tt-filter-sel {
+  width: calc(100% - 2.4rem);
+  margin: 0 1.2rem .8rem;
+  padding: .5rem .6rem;
+  background: rgba(22,34,61,0.95);
+  border: 1px solid rgba(233,196,106,0.22);
+  border-radius: 6px;
+  color: #efe7d6;
+  font-family: var(--font-ui);
+  font-size: 1.3rem;
+  cursor: pointer;
+}
+.tt-filter-sel:focus { outline: none; border-color: rgba(233,196,106,0.5); }
+
+[data-theme="light"] #ttFilterBtn {
+  background: rgba(250,246,238,0.96);
+  border-color: rgba(26,94,60,0.35);
+  color: #1a5e3c;
+  box-shadow: 0 .4rem 1rem rgba(0,0,0,.15);
+}
+[data-theme="light"] #ttFilterBtn:hover,
+[data-theme="light"] #ttFilterBtn[aria-expanded="true"] {
+  background: rgba(240,250,244,0.98);
+  border-color: #1a5e3c;
+}
+[data-theme="light"] #ttFilterPanel {
+  background: rgba(250,246,238,0.98);
+  border-color: rgba(26,94,60,0.22);
+  box-shadow: 0 .6rem 2rem rgba(0,0,0,.18);
+}
+[data-theme="light"] .tt-filter-sel {
+  background: #ffffff;
+  border-color: rgba(26,94,60,0.22);
+  color: #1c1a12;
+}
+[data-theme="light"] .tt-filter-sel:focus { border-color: rgba(26,94,60,0.5); }
+
+/* ── Reading progress bar ── */
+#tt-progress {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  z-index: 200;
+  background: transparent;
+  pointer-events: none;
+}
+#tt-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--gold), rgba(233,193,118,0.6));
+  transition: width 0.1s linear;
+}
+[data-theme="light"] body.page-tu-thuat #tt-progress-bar {
+  background: linear-gradient(90deg, #1a5e3c, #c8963e);
+}
+
+/* ── Prose container: width tối ưu cho đọc dài ── */
+body.page-tu-thuat .tt-prose {
+  font-size: 1.9rem;
+  line-height: 2.0;
+}
+
+/* ── Căn đỉnh panel "Mục lục" ngang hàng với dòng đầu nội dung ──
+   Phần tử đầu (h2 "QUYỂN …") có margin-top 5rem đẩy nội dung xuống, còn .toc bắt đầu
+   ở đỉnh cột grid → bỏ margin-top phần tử đầu. Đặt trong is:global vì nội dung do JS
+   nạp bằng innerHTML (không có data-astro-cid nên rule scoped không áp dụng). */
+body.page-tu-thuat #tt-chapter-content > :first-child { margin-top: 0; }
+
+/* ── Scroll offset: tính cả site navbar (7rem) + thanh select book (~3rem) ── */
+body.page-tu-thuat .tt-prose h2,
+body.page-tu-thuat .tt-prose h3,
+body.page-tu-thuat .tt-prose h4,
+body.page-tu-thuat .tt-prose [id^="user-content-fn"],
+body.page-tu-thuat .tt-prose .footnotes li {
+  scroll-margin-top: 10rem;
+}
+
+/* ── H2: đầu quyển/phần lớn — centered, có ornament ── */
+body.page-tu-thuat .tt-prose h2 {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 2.6rem;
+  font-weight: 700;
+  text-align: center;
+  color: var(--ink-cream);
+  -webkit-text-fill-color: var(--ink-cream);
+  background: none;
+  border-bottom: none;
+  margin: 5rem 0 2.4rem;
+  padding-bottom: 0;
+  position: relative;
+}
+body.page-tu-thuat .tt-prose h2::before {
+  content: '✦';
+  display: block;
+  font-size: 1rem;
+  color: var(--gold);
+  opacity: 0.6;
+  margin-bottom: 1.2rem;
+  letter-spacing: 0.5em;
+}
+body.page-tu-thuat .tt-prose h2::after {
+  content: '';
+  display: block;
+  width: 6rem;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(233,193,118,0.35), transparent);
+  margin: 1.4rem auto 0;
+}
+
+/* ── H3: tiêu đề chương — gold, left ── */
+body.page-tu-thuat .tt-prose h3 {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 2.15rem;
+  font-weight: 600;
+  color: var(--gold);
+  margin: 3.6rem 0 1.2rem;
+  padding-left: 1.4rem;
+  border-left: 3px solid rgba(233,193,118,0.4);
+}
+
+/* ── H4: tiêu đề nhỏ ── */
+body.page-tu-thuat .tt-prose h4 {
+  font-size: 1.85rem;
+  color: var(--ink-cream-soft);
+  margin: 2.8rem 0 1rem;
+  font-style: italic;
+}
+
+/* ── Blockquote: treatment đặc biệt cho trích dẫn ── */
+body.page-tu-thuat .tt-prose blockquote {
+  margin: 3.2rem 0;
+  padding: 2.4rem 2.8rem;
+  border-left: none;
+  border-top: 1px solid rgba(233,193,118,0.2);
+  border-bottom: 1px solid rgba(233,193,118,0.2);
+  background: rgba(233,193,118,0.04);
+  border-radius: 0;
+  font-size: 1.85rem;
+  line-height: 1.9;
+  color: var(--ink-cream);
+  font-style: italic;
+  position: relative;
+}
+body.page-tu-thuat .tt-prose blockquote::before {
+  content: '\201C';
+  position: absolute;
+  top: -0.5rem;
+  left: 1.6rem;
+  font-family: 'Playfair Display', serif;
+  font-size: 7rem;
+  line-height: 1;
+  color: rgba(233,193,118,0.18);
+  font-style: normal;
+}
+body.page-tu-thuat .tt-prose blockquote p {
+  text-align: left;
+  position: relative;
+  z-index: 1;
+}
+body.page-tu-thuat .tt-prose blockquote cite,
+body.page-tu-thuat .tt-prose blockquote p:last-child:not(:first-child) {
+  display: block;
+  font-size: 1.5rem;
+  font-style: normal;
+  color: var(--gold);
+  margin-top: 1rem;
+  text-align: right;
+  opacity: 0.8;
+}
+
+/* ── Drop cap: đầu mỗi h2 section ── */
+body.page-tu-thuat .tt-prose[data-content-slug="bio"] h2 + p::first-letter,
+body.page-tu-thuat .tt-prose[data-content-slug="bio"] > p:first-of-type::first-letter {
+  float: left;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 4.8em;
+  line-height: 0.82;
+  padding: 0.04em 0.14em 0 0;
+  color: var(--gold);
+  text-shadow: 0 0 28px rgba(233,193,118,0.18);
+}
+
+/* ── Light mode overrides cho content ── */
+[data-theme="light"] body.page-tu-thuat .tt-prose h2 {
+  color: #1a5e3c;
+  -webkit-text-fill-color: #1a5e3c;
+}
+[data-theme="light"] body.page-tu-thuat .tt-prose h2::before { color: #c8963e; }
+[data-theme="light"] body.page-tu-thuat .tt-prose h2::after {
+  background: linear-gradient(to right, transparent, rgba(26,94,60,0.3), transparent);
+}
+[data-theme="light"] body.page-tu-thuat .tt-prose h3 {
+  color: #9c6a2e;
+  border-left-color: rgba(156,106,46,0.45);
+}
+[data-theme="light"] body.page-tu-thuat .tt-prose h4 { color: #4a3828; }
+[data-theme="light"] body.page-tu-thuat .tt-prose blockquote {
+  background: rgba(26,94,60,0.04);
+  border-top-color: rgba(26,94,60,0.18);
+  border-bottom-color: rgba(26,94,60,0.18);
+  color: #2a1e10;
+}
+[data-theme="light"] body.page-tu-thuat .tt-prose blockquote::before { color: rgba(26,94,60,0.1); }
+[data-theme="light"] body.page-tu-thuat .tt-prose blockquote cite,
+[data-theme="light"] body.page-tu-thuat .tt-prose blockquote p:last-child:not(:first-child) { color: #9c6a2e; }
+[data-theme="light"] body.page-tu-thuat .tt-prose[data-content-slug="bio"] h2 + p::first-letter,
+[data-theme="light"] body.page-tu-thuat .tt-prose[data-content-slug="bio"] > p:first-of-type::first-letter { color: #9c6a2e; }
+</style>
+
+<script>
+document.getElementById('backBtn')?.remove();
+
+
+// ── Article number formatter ──
+function processArticleNums(container: Element) {
+  container.querySelectorAll<HTMLParagraphElement>('p').forEach((p) => {
+    if (p.closest('.footnotes')) return;
+    const walker = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+    const first = walker.nextNode() as Text | null;
+    if (!first) return;
+    const m = first.textContent?.match(/^(\d+\.?\s)/);
+    if (!m) return;
+    const span = document.createElement('span');
+    span.className = 'article-num';
+    span.textContent = m[1];
+    const rest = document.createTextNode((first.textContent ?? '').slice(m[1].length));
+    first.parentNode?.replaceChild(span, first);
+    span.after(rest);
+  });
+}
+
+// ── Lazy chapter loader ──
+(function () {
+  const tabs    = document.querySelectorAll<HTMLButtonElement>('.tt-book-tab[data-fragment-slug]');
+  const content = document.getElementById('tt-chapter-content') as HTMLElement;
+  const loading = document.getElementById('tt-chapter-loading') as HTMLElement;
+  const nav     = document.querySelector<HTMLElement>('.tt-book-nav');
+  if (!tabs.length || !content) return;
+
+  const BASE = `${import.meta.env.BASE_URL.replace(/\/?$/, '/')}tu-thuat/fragment/`;
+  const cache = new Map<string, string>();
+  // Pre-cache bio (default content already in DOM)
+  cache.set('bio', content.innerHTML);
+
+  // Process article nums in initial content
+  processArticleNums(content);
+
+  function scrollToH2() {
+    const h2 = content.querySelector<HTMLElement>('h2');
+    if (!h2) return;
+    // site navbar 7rem + book nav height + margin
+    const offset = (document.querySelector<HTMLElement>('.navbar')?.offsetHeight ?? 70) + (nav?.offsetHeight ?? 44) + 8;
+    const top = h2.getBoundingClientRect().top + window.scrollY - offset;
+    window.scrollTo({ top, behavior: 'instant' });
+  }
+
+  async function loadChapter(slug: string) {
+    if (cache.has(slug)) {
+      content.innerHTML = cache.get(slug)!;
+      content.dataset.contentSlug = slug;
+      processArticleNums(content);
+      scrollToH2();
+      (window as any).__ttBuildToc?.();
+      (window as any).__ttBuildFilters?.();
+      return;
+    }
+    loading.hidden = false;
+    content.style.opacity = '0.35';
+    try {
+      const resp = await fetch(`${BASE}${slug}/`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const html = await resp.text();
+      const doc  = new DOMParser().parseFromString(html, 'text/html');
+      const frag = doc.querySelector('.tt-fragment-content')?.innerHTML ?? '<p>Đang cập nhật…</p>';
+      cache.set(slug, frag);
+      content.innerHTML = frag;
+      content.dataset.contentSlug = slug;
+      processArticleNums(content);
+    } catch {
+      content.innerHTML = '<p style="color:var(--ink-cream-soft);text-align:center;padding:4rem">Không thể tải nội dung. Vui lòng thử lại.</p>';
+    } finally {
+      loading.hidden = true;
+      content.style.opacity = '';
+      scrollToH2();
+      (window as any).__ttBuildToc?.();
+      (window as any).__ttBuildFilters?.();
+    }
+  }
+
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      if (tab.classList.contains('active')) return;
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      tab.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+      loadChapter(tab.dataset.fragmentSlug!);
+    });
+  });
+})();
+
+// ── TOC list toggle (mục lục Quyển/Chương/Đoạn) ──
+(function () {
+  const widget = document.getElementById('docFloatToc');
+  const panel  = document.getElementById('dftPanel') as HTMLElement;
+  const btn    = document.getElementById('dftBtn') as HTMLButtonElement;
+  const nav    = document.querySelector<HTMLElement>('.tt-book-nav');
+  if (!widget || !panel || !btn) return;
+
+  function openPanel(open: boolean) {
+    panel.classList.toggle('open', open);
+    btn.setAttribute('aria-expanded', String(open));
+  }
+  function buildToc() {
+    const content  = document.getElementById('tt-chapter-content');
+    const dftNav   = document.getElementById('dftNav');
+    const tocList  = document.getElementById('tt-toc-list');
+    if (!content || !dftNav) return;
+    const headings = content.querySelectorAll<HTMLElement>('h2, h3, h4');
+    dftNav.innerHTML = '';
+    if (tocList) tocList.innerHTML = '';
+    const depthOf = (tag: string) => (tag === 'H4' ? 4 : tag === 'H3' ? 3 : 2);
+    headings.forEach((h, idx) => {
+      if (!h.id) h.id = `tt-h-${idx}`;
+      // Float TOC panel link
+      const a = document.createElement('a');
+      a.href = `#${h.id}`;
+      a.textContent = h.textContent ?? '';
+      a.className = `bft-link bft-depth-${depthOf(h.tagName)}`;
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        openPanel(false);
+        const offset = (document.querySelector<HTMLElement>('.navbar')?.offsetHeight ?? 70) + (nav?.offsetHeight ?? 44) + 8;
+        const top = h.getBoundingClientRect().top + window.scrollY - offset;
+        window.scrollTo({ top, behavior: 'instant' });
+      });
+      dftNav.appendChild(a);
+      // Sidebar TOC list item
+      if (tocList) {
+        const li = document.createElement('li');
+        li.className = `toc-depth-${depthOf(h.tagName)}`;
+        const la = document.createElement('a');
+        la.href = `#${h.id}`;
+        la.textContent = h.textContent ?? '';
+        la.addEventListener('click', (e) => {
+          e.preventDefault();
+          const offset = (document.querySelector<HTMLElement>('.navbar')?.offsetHeight ?? 70) + (nav?.offsetHeight ?? 44) + 8;
+          const top = h.getBoundingClientRect().top + window.scrollY - offset;
+          window.scrollTo({ top, behavior: 'instant' });
+        });
+        li.appendChild(la);
+        tocList.appendChild(li);
+      }
+    });
+  }
+  // ── Dynamic label: cập nhật tên mục đang đọc ──
+  const dftLabel = document.getElementById('dftLabel');
+  let headingObserver: IntersectionObserver | null = null;
+
+  function updateDynamicLabel(headings: NodeListOf<HTMLElement>) {
+    if (headingObserver) headingObserver.disconnect();
+    if (!dftLabel) return;
+    let activeText = 'Mục Lục';
+    headingObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.boundingClientRect.top < 180) {
+          activeText = (entry.target.textContent ?? '').trim();
+          const short = activeText.length > 28 ? activeText.slice(0, 26) + '…' : activeText;
+          dftLabel.textContent = short || 'Mục Lục';
+        }
+      });
+    }, { rootMargin: '-10px 0px -80% 0px', threshold: 0 });
+    headings.forEach((h) => headingObserver!.observe(h));
+  }
+
+  function buildTocAndLabel() {
+    buildToc();
+    const content = document.getElementById('tt-chapter-content');
+    if (content) {
+      const hs = content.querySelectorAll<HTMLElement>('h2, h3, h4');
+      updateDynamicLabel(hs);
+    }
+  }
+
+  btn.addEventListener('click', () => {
+    const opening = !panel.classList.contains('open');
+    openPanel(opening);
+    if (opening) buildToc();
+  });
+  document.addEventListener('click', (e) => {
+    if (!widget.contains(e.target as Node)) openPanel(false);
+  }, { capture: true });
+
+  widget.classList.add('show');
+  (window as any).__ttBuildToc = buildTocAndLabel;
+  buildTocAndLabel();
+})();
+
+// ── Filter: Quyển → Đoạn (h4) → Số đoạn (số paragraph) ──
+(function () {
+  const widget   = document.getElementById('ttFilter');
+  const panel    = document.getElementById('ttFilterPanel') as HTMLElement;
+  const btn      = document.getElementById('ttFilterBtn') as HTMLButtonElement;
+  const nav      = document.querySelector<HTMLElement>('.tt-book-nav');
+  const selQuyen = document.getElementById('ttSelQuyen') as HTMLSelectElement;
+  const selDoan  = document.getElementById('ttSelDoan') as HTMLSelectElement;
+  const selSo    = document.getElementById('ttSelSo') as HTMLSelectElement;
+  const tabs     = Array.from(document.querySelectorAll<HTMLButtonElement>('.tt-book-tab[data-fragment-slug]'));
+  if (!widget || !panel || !btn || !selQuyen || !selDoan || !selSo) return;
+
+  function openPanel(open: boolean) {
+    panel.classList.toggle('open', open);
+    btn.setAttribute('aria-expanded', String(open));
+  }
+  function scrollToId(id: string) {
+    const el = id ? document.getElementById(id) : null;
+    if (!el) return;
+    const offset = (document.querySelector<HTMLElement>('.navbar')?.offsetHeight ?? 70) + (nav?.offsetHeight ?? 44) + 8;
+    const top = el.getBoundingClientRect().top + window.scrollY - offset;
+    window.scrollTo({ top, behavior: 'instant' });
+  }
+
+  // Quyển: lấy từ danh sách tab
+  selQuyen.innerHTML = '<option value="">— Chọn quyển —</option>' +
+    tabs.map(t => `<option value="${t.dataset.fragmentSlug}">${(t.textContent ?? '').trim()}</option>`).join('');
+
+  type Para = { id: string; num: string };
+  type Doan = { id: string; text: string; paras: Para[] };
+  let doans: Doan[] = [];
+
+  function fillSo(list: Para[]) {
+    selSo.innerHTML = '<option value="">— Số đoạn —</option>' +
+      list.map(p => `<option value="${p.id}">${p.num}</option>`).join('');
+  }
+
+  // Dựng lại Đoạn (h4) + Số đoạn (paragraph có .article-num) theo thứ tự DOM
+  function buildFilters() {
+    const content = document.getElementById('tt-chapter-content');
+    if (!content) return;
+    doans = [];
+    let cur: Doan | null = null;
+    let hi = 0, pi = 0;
+    content.querySelectorAll<HTMLElement>('h4, p').forEach((el) => {
+      if (el.tagName === 'H4') {
+        if (!el.id) el.id = `tt-h4-${hi++}`;
+        cur = { id: el.id, text: (el.textContent ?? '').trim(), paras: [] };
+        doans.push(cur);
+      } else {
+        const numSpan = el.querySelector('.article-num');
+        if (!numSpan) return;
+        if (!el.id) el.id = `tt-p-${pi++}`;
+        const num = (numSpan.textContent ?? '').trim().replace(/\.$/, '');
+        if (!cur) { cur = { id: '', text: 'Khác', paras: [] }; doans.push(cur); }
+        cur.paras.push({ id: el.id, num });
+      }
+    });
+    selDoan.innerHTML = '<option value="">— Đoạn —</option>' +
+      doans.filter(d => d.id).map(d => `<option value="${d.id}">${d.text}</option>`).join('');
+    fillSo(doans.flatMap(d => d.paras));
+    const active = tabs.find(t => t.classList.contains('active'));
+    selQuyen.value = active?.dataset.fragmentSlug ?? '';
+  }
+
+  // Đổi Quyển → nạp nội dung qua tab (giữ panel mở)
+  selQuyen.addEventListener('change', () => {
+    const tab = tabs.find(t => t.dataset.fragmentSlug === selQuyen.value);
+    if (tab && !tab.classList.contains('active')) tab.click();
+  });
+  // Đổi Đoạn → cuộn tới, lọc Số đoạn theo đoạn (giữ panel mở)
+  selDoan.addEventListener('change', () => {
+    const id = selDoan.value;
+    if (!id) { fillSo(doans.flatMap(d => d.paras)); return; }
+    const d = doans.find(x => x.id === id);
+    fillSo(d ? d.paras : []);
+    scrollToId(id);
+  });
+  // Đổi Số đoạn → cuộn tới rồi đóng panel
+  selSo.addEventListener('change', () => {
+    scrollToId(selSo.value);
+    openPanel(false);
+  });
+
+  btn.addEventListener('click', () => {
+    const opening = !panel.classList.contains('open');
+    openPanel(opening);
+    if (opening) buildFilters();
+  });
+  document.addEventListener('click', (e) => {
+    if (!widget.contains(e.target as Node)) openPanel(false);
+  }, { capture: true });
+
+  widget.classList.add('show');
+  (window as any).__ttBuildFilters = buildFilters;
+  buildFilters();
+})();
+
+// ── Reading progress bar ──
+const progressBar = document.getElementById('tt-progress-bar');
+if (progressBar) {
+  function updateProgress() {
+    const scrollTop = window.scrollY;
+    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+    progressBar.style.width = docHeight > 0 ? `${(scrollTop / docHeight) * 100}%` : '0%';
+  }
+  window.addEventListener('scroll', updateProgress, { passive: true });
+  updateProgress();
+}
+
+// Điều hướng footnote (offset nav + highlight 2 chiều) đã chuyển sang BaseLayout — dùng chung toàn site.
+
+// ── Sliding TOC toggle ──
+(function () {
+  const shell   = document.querySelector<HTMLElement>('.article-shell.has-toc');
+  const trigger = document.querySelector<HTMLButtonElement>('.toc-trigger');
+  if (!shell || !trigger) return;
+
+  function setOpen(open: boolean) {
+    shell.classList.toggle('toc-open', open);
+    trigger.setAttribute('aria-expanded', String(open));
+  }
+
+  trigger.addEventListener('click', () => {
+    setOpen(!shell.classList.contains('toc-open'));
+  });
+
+  // Active link highlight via IntersectionObserver (rebuild after each chapter load)
+  let observer: IntersectionObserver | null = null;
+  function observeHeadings() {
+    observer?.disconnect();
+    const tocList = document.getElementById('tt-toc-list');
+    if (!tocList) return;
+    const links = Array.from(tocList.querySelectorAll<HTMLAnchorElement>('a'));
+    if (!links.length) return;
+    observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        const id = entry.target.id;
+        links.forEach(l => l.classList.toggle('is-active', l.getAttribute('href') === `#${id}`));
+      });
+    }, { rootMargin: '-10% 0px -80% 0px' });
+    links.forEach(l => {
+      const id = l.getAttribute('href')?.slice(1);
+      if (id) { const el = document.getElementById(id); if (el) observer!.observe(el); }
+    });
+  }
+
+  // Attach after initial buildToc
+  setTimeout(observeHeadings, 100);
+  const origBuildToc = (window as any).__ttBuildToc;
+  (window as any).__ttBuildToc = function () {
+    origBuildToc?.();
+    setTimeout(observeHeadings, 100);
+  };
+})();
+
+</script>

@@ -1,0 +1,26 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import pageHeaders from '../../data/page-headers.json';
+
+const ph = (pageHeaders as Record<string, Record<string, string>>)['bai-viet'];
+---
+
+<BaseLayout title={ph.title} bodyClass="page-articles no-sidebar" banner="bai-viet-triet-hoc">
+  <div class="article-page-shell">
+    <PageHeader title={ph.title} sub={ph.sub} />
+  </div>
+</BaseLayout>
+
+<style>
+  .article-page-shell {
+    width: min(100% - 4.8rem, 112rem);
+    min-height: 20rem;
+    margin: 0 auto;
+    padding: 1rem 0 8rem;
+  }
+
+  @media (max-width: 640px) {
+    .article-page-shell { width: min(100% - 3.2rem, 112rem); }
+  }
+</style>

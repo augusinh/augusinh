@@ -1,0 +1,643 @@
+---
+import { getEntry, render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import TableOfContents from '../../components/TableOfContents.astro';
+import pageHeaders from '../../data/page-headers.json';
+const taPh = (pageHeaders as Record<string, Record<string, string>>)['thanh-au-tinh'];
+
+const entry = await getEntry('thanh-chan-phuoc', 'st-augustine-of-hippo');
+if (!entry) return Astro.redirect('/404');
+const { Content, headings } = await render(entry);
+const tocHeadings = headings.filter(h => h.depth <= 3);
+
+interface TlEntry {
+  year: string;
+  aug?: string;
+  world?: string;
+  major?: boolean;
+  era?: string;
+}
+
+const TIMELINE: TlEntry[] = [
+  // ── Thời Thơ Ấu và Học Vấn ────────────────────────────────────
+  { year: '354', aug: 'Sinh tại Thagaste, ngày 13/11. Cha Patricius ngoại giáo, mẹ Monica Kitô hữu', world: 'John Chrysostom ra đời', major: true, era: 'Thời Thơ Ấu và Học Vấn' },
+  { year: '355', aug: 'Học ở Thagaste; bệnh nặng — suýt được rửa tội', world: 'Donatus xứ Capa Negra qua đời' },
+  { year: '356', world: 'Marius Victorinus trở lại Kitô giáo ở Roma; Antôn Ai Cập qua đời' },
+  { year: '361', aug: 'Học tu từ tại Madaura', world: 'Julian Bội Đạo: sắc chiếu bình đẳng tôn giáo; ban hành luật trường học' },
+  { year: '362', world: 'Công đồng Alexandria với Athanasiô và các giám mục Ai Cập' },
+  { year: '364', aug: 'Ngừng học; trở về Thagaste', world: 'Ly giáo Donatist bùng phát ở Bắc Phi' },
+  { year: '365', world: 'Bầu chọn Athanasiô giám mục Roma; bất ổn xã hội' },
+  // ── Hành Trình Tìm Kiếm ───────────────────────────────────────
+  { year: '369/70', aug: 'Đến Carthage học; sống chung với một phụ nữ (bạn đời không hôn nhân)', world: 'Phong trào Priscillian khởi phát ở Tây Ban Nha', era: 'Hành Trình Tìm Kiếm' },
+  { year: '370', world: 'Basil trở thành giám mục Caesarea' },
+  { year: '370/71', aug: 'Cha Patricius qua đời; Adeodatus ra đời', world: 'Gregory Nyssa làm giám mục; Martin làm giám mục Tours' },
+  { year: '371/72', world: 'Gregory Nazianzus làm giám mục; cuộc nổi dậy Firmus ở vùng Berber' },
+  { year: '372', world: 'Athanasiô Alexandrie qua đời; cấm tái rửa tội (CT 16:6.1)' },
+  { year: '373', aug: 'Đọc Hortensius (Cicero); gia nhập phái Manichaean', world: 'Ambrosiô được rửa tội (7/11) và tấn phong giám mục Milan (7/12)', major: true },
+  { year: '374', aug: 'Dạy tu từ ở Thagaste', world: 'Basil xứ Caesarea qua đời' },
+  { year: '375', aug: 'Một người bạn thân qua đời' },
+  { year: '376/77', aug: 'Dạy tu từ ở Carthage' },
+  { year: '379/81', aug: 'Viết De pulchro et apto — bản thảo triết học đầu tay', world: 'Công đồng Constantinople; Theodosiô cấm ngoại giáo' },
+  { year: '380', aug: 'Đọc Phạm Trù luận (Aristotle)', world: 'Chiếu Thessalonika: Kitô giáo thành quốc giáo La Mã' },
+  { year: '382/84', aug: 'Gặp Faustus ở Carthage; dạy học ở Roma', world: 'Symmachus làm tổng trấn Roma; Giáo hoàng Damasus qua đời (384)' },
+  { year: '383', aug: 'Bổ nhiệm Quan Tu Từ hoàng gia ở Milan (mùa thu)', world: 'Symmachus xin phục hồi Bàn thờ Chiến thắng; Ambrosiô phản đối' },
+  { year: '384', aug: 'Diễn văn mừng Bauto; đính hôn; gặp Ambrosiô', world: 'Hierônimô đến Palestine; Priscillian bị hành quyết ở Trier' },
+  { year: '385', aug: 'Monica đến Milan; Diễn văn mừng Valentinianus II', world: 'Tìm thấy hài cốt SS. Gervasius và Protasius (17/7)' },
+  { year: '385/86', aug: 'Đọc các sách Tân Platon (Plotinus, Porphyry)', world: 'Vây hãm vương cung thánh đường ở Milan; truy quét Manichees ở Carthage' },
+  { year: '386', aug: 'Đọc thư Phaolô; Ponticianus kể về Antôn; rút lui Cassiciacum', world: 'Ambrosiô chống lại Hoàng hậu Justina; Maximus xâm lược Ý', major: true },
+  // ── Trở Về và Thánh Hiến ──────────────────────────────────────
+  { year: '387', aug: 'Rửa Tội đêm Vọng Phục Sinh do Ambrosiô; Monica qua đời ở Ostia', major: true, era: 'Trở Về và Thánh Hiến' },
+  { year: '387/88', aug: 'Về Bắc Phi; định cư ở Thagaste; lập cộng đoàn tu trì' },
+  { year: '388/90', aug: 'Adeodatus và Nebridius qua đời' },
+  { year: '390', aug: 'Thụ phong linh mục ở Hippô', world: 'Thảm sát Thessalonika; Theodosiô chịu ép buộc hối tội từ Ambrosiô', major: true },
+  { year: '391', world: 'Aurelius làm giám mục Carthage; sắc chiếu chống ngoại giáo' },
+  { year: '392', aug: 'Tranh luận công khai với Fortunatus ở Hippô' },
+  { year: '393', aug: 'Phát biểu tại Công đồng Hippô (tháng 10)', world: 'Maximian tách khỏi phái Donatist' },
+  { year: '394', aug: 'Phát biểu tại Công đồng Carthage (tháng 6–8)', world: 'Theodosiô đánh bại Eugenius; Paulinus Nola được thụ phong' },
+  { year: '395', aug: 'Tấn phong giám mục phụ tá Hippô; kế vị Valerius', world: 'Theodosiô qua đời — đế quốc chia thành Đông và Tây La Mã', major: true },
+  // ── Giám Mục Hippô ────────────────────────────────────────────
+  { year: '396/97', aug: 'Trở thành giám mục chính tòa; bắt đầu Tự Thuật (Confessiones)', major: true, era: 'Giám Mục Hippô' },
+  { year: '397', world: 'Ambrosiô qua đời (4/4); Simplicianus kế vị' },
+  { year: '398', aug: 'Giảng ở Carthage mùa hè', world: 'Công đồng Carthage; đánh bại Gildo; luật chống Donatist' },
+  { year: '400', aug: 'Hoàn thành Tự Thuật — tự truyện thần học đầu tiên phương Tây', major: true },
+  { year: '403', aug: 'Công đồng Carthage: đề nghị đối thoại chính thức với Donatist' },
+  { year: '405', world: 'Chiếu thống nhất: Donatist bị liệt vào lạc giáo' },
+  { year: '410', aug: 'Bắt đầu Thành Đô Thiên Chúa (De Civitate Dei)', world: 'Alaric và quân Visigoth cướp phá Roma — chấn động toàn cõi', major: true },
+  { year: '411', aug: 'Hội nghị Carthage: đối thoại công khai với Donatist', world: 'Donatist bị lên án bởi quan tòa đế quốc' },
+  { year: '412', aug: 'Bắt đầu chống lạc thuyết Pelagian' },
+  { year: '415', world: 'Tìm thấy hài cốt thánh Stêphanô ở Hippô' },
+  { year: '416', world: 'Công đồng Carthage và Milevis lên án Pelagius và Caelestius' },
+  { year: '417', world: 'Giáo hoàng Innôcentê I lên án Pelagius và Caelestius' },
+  { year: '418', aug: 'Tranh luận với Julian thành Eclanum về ân sủng và tội nguyên tổ', world: 'Công đồng Carthage lên án Pelagius; Caelestius bị trục xuất' },
+  { year: '421', aug: 'Vụ bất phục tùng ở Hippô — tranh chấp kỷ luật cộng đoàn' },
+  { year: '426', aug: 'Hoàn thành Thành Đô Thiên Chúa sau 13 năm viết', major: true },
+  { year: '427', aug: 'Viết Retractationes — tổng kết và điều chỉnh toàn bộ tác phẩm' },
+  { year: '429', world: 'Vandals xâm chiếm Bắc Phi từ Tây Ban Nha' },
+  { year: '430', aug: 'Qua đời ngày 28/8, thọ 76 tuổi — đọc Thánh Vịnh Thống Hối trong nước mắt', world: 'Vandals vây thành Hippô; thành phố thất thủ sau khi ngài qua đời', major: true },
+];
+---
+
+<BaseLayout
+  title="Thánh Augustinô thành Hippô"
+  banner="thanh-au-tinh"
+  bodyClass="no-sidebar page-thanh-au-tinh"
+  type="article"
+  description="Tiểu sử và niên biểu Thánh Augustinô thành Hippô — Tổ Phụ Dòng Augustinô, Giám Mục, Tiến Sĩ Hội Thánh."
+>
+
+<!-- ── Hero ── -->
+<div class="aug-hero">
+  <div class="aug-hero-text">
+    <p class="aug-eyebrow" data-oe-target="ph" data-oe="eyebrow">{taPh.eyebrow}</p>
+    <h1 class="aug-name" data-oe-target="ph" data-oe="name" data-oe-html="true" set:html={taPh.name.replace('\n','<br>')}></h1>
+    <div class="aug-rule" aria-hidden="true"><span class="aug-rule-ornament">✦</span></div>
+    <div class="aug-meta">
+      <span class="aug-dates" data-oe-target="ph" data-oe="dates">{taPh.dates}</span>
+      <span class="aug-sep" aria-hidden="true">·</span>
+      <span class="rank-badge rank-solemn aug-feast" data-oe-target="ph" data-oe="feast">{taPh.feast}</span>
+    </div>
+    <blockquote class="aug-motto">
+      <span data-oe-target="ph" data-oe="motto">{taPh.motto}</span>
+      <cite data-oe-target="ph" data-oe="mottoCite" data-oe-html="true" set:html={taPh.mottoCite}></cite>
+    </blockquote>
+  </div>
+  <figure class="aug-portrait" aria-label="Chân dung Thánh Augustinô">
+    <div class="aug-arch-frame">
+      <img src="/db/saints/images/st-augustine-of-hippo.jpg" alt="Thánh Augustinô thành Hippô" loading="eager" decoding="async" />
+    </div>
+    <figcaption>Giám Mục · Tiến Sĩ Hội Thánh</figcaption>
+  </figure>
+</div>
+
+<!-- ── Tab bar ── -->
+<div class="aug-tab-bar" role="tablist" aria-label="Nội dung trang">
+  <button class="aug-tab-btn active" role="tab" id="tab-tieu-su-btn"
+    aria-controls="panel-tieu-su" aria-selected="true" data-tab="tieu-su">
+    Tiểu Sử
+  </button>
+  <button class="aug-tab-btn" role="tab" id="tab-nien-bieu-btn"
+    aria-controls="panel-nien-bieu" aria-selected="false" data-tab="nien-bieu">
+    Niên Biểu
+  </button>
+</div>
+
+<!-- ── Panel 1: Tiểu Sử ── -->
+<div class="aug-panel" id="panel-tieu-su" role="tabpanel" aria-labelledby="tab-tieu-su-btn">
+  <div class={`article-shell ${tocHeadings.length > 1 ? 'has-toc toc-open' : ''}`}>
+    {tocHeadings.length > 1 && <TableOfContents headings={tocHeadings} />}
+    <article class="prose"><Content /></article>
+  </div>
+</div>
+
+<!-- ── Panel 2: Niên Biểu ── -->
+<div class="aug-panel" id="panel-nien-bieu" role="tabpanel" aria-labelledby="tab-nien-bieu-btn" hidden>
+
+  <div class="tl-wrap">
+    {TIMELINE.map((row, i) => {
+      const showEra = row.era && (i === 0 || row.era !== TIMELINE[i - 1].era);
+      return (
+        <>
+          {showEra && (
+            <div class="tl-era">
+              <span>{row.era}</span>
+            </div>
+          )}
+          <div
+            class={`tl-row${row.major ? ' tl-major' : ''}`}
+            data-has-aug={row.aug ? 'true' : 'false'}
+            data-has-world={row.world ? 'true' : 'false'}
+          >
+            <!-- Left: Augustine -->
+            <div class="tl-side tl-left">
+              {row.aug && <p class="tl-text tl-text-aug">{row.aug}</p>}
+            </div>
+
+            <!-- Center: year pill + node -->
+            <div class="tl-center">
+              <div class={`tl-node${row.major ? ' tl-node-major' : ''}`}></div>
+              <span class="tl-year">{row.year}</span>
+            </div>
+
+            <!-- Right: World -->
+            <div class="tl-side tl-right">
+              {row.world && <p class="tl-text tl-text-world">{row.world}</p>}
+            </div>
+          </div>
+        </>
+      );
+    })}
+  </div>
+
+  <p class="tl-source">
+    Markus, Robert A. "Life, Culture, and Controversies of Augustine." In <em>Augustine through the Ages: An Encyclopedia</em>, edited by A. D. Fitzgerald, 498–504. Grand Rapids, MI: Eerdmans, 1999.
+  </p>
+</div>
+
+  <!-- INLINE EDIT TOOLBAR -->
+  <div id="oe-bar" class="oe-bar" hidden>
+    <button id="oe-edit-btn" class="oe-bar-btn">
+      <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793z"/>
+        <path d="M11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+      </svg>
+      Chỉnh sửa
+    </button>
+    <div id="oe-save-row" class="oe-save-row" hidden>
+      <span id="oe-msg" class="oe-msg"></span>
+      <button id="oe-cancel-btn" class="oe-bar-btn oe-bar-cancel">Huỷ</button>
+      <button id="oe-save-btn" class="oe-bar-btn oe-bar-save">Lưu</button>
+    </div>
+  </div>
+
+</BaseLayout>
+
+<style is:global>
+/* ── Light mode: hero ── */
+[data-theme="light"] body.page-thanh-au-tinh .aug-eyebrow { color: var(--gold-dim); }
+[data-theme="light"] body.page-thanh-au-tinh .aug-rule::before,
+[data-theme="light"] body.page-thanh-au-tinh .aug-rule::after { background: linear-gradient(to right, transparent, rgba(122,90,26,0.3), transparent); }
+[data-theme="light"] body.page-thanh-au-tinh .aug-rule-ornament { color: var(--gold-dim); opacity: 0.55; }
+[data-theme="light"] body.page-thanh-au-tinh .aug-dates { color: var(--gold); }
+[data-theme="light"] body.page-thanh-au-tinh .aug-sep { color: var(--gold-dim); opacity: 0.5; }
+[data-theme="light"] body.page-thanh-au-tinh .aug-feast { color: #efe7d6; }
+[data-theme="light"] body.page-thanh-au-tinh .aug-motto { color: var(--ink-cream); }
+[data-theme="light"] body.page-thanh-au-tinh .aug-motto cite { color: var(--gold-dim); }
+[data-theme="light"] body.page-thanh-au-tinh .aug-portrait figcaption { color: var(--ink-cream-soft); }
+
+/* ── Light mode: timeline ── */
+[data-theme="light"] body.page-thanh-au-tinh .tl-era::before,
+[data-theme="light"] body.page-thanh-au-tinh .tl-era::after { background: var(--deco-rule); }
+[data-theme="light"] body.page-thanh-au-tinh .tl-era span { color: var(--ink-cream-soft); letter-spacing: 0.14em; }
+[data-theme="light"] body.page-thanh-au-tinh .tl-node { border-color: var(--gold-dim); background: var(--bg-main); }
+[data-theme="light"] body.page-thanh-au-tinh .tl-node-major { background: var(--gold-dim); border-color: var(--gold-dim); box-shadow: 0 0 8px rgba(122,90,26,0.35); }
+[data-theme="light"] body.page-thanh-au-tinh .tl-year { color: var(--ink-cream-soft); }
+[data-theme="light"] body.page-thanh-au-tinh .tl-major .tl-year { color: var(--gold-dim); }
+/* Cột Augustine — ink ấm, không đen */
+[data-theme="light"] body.page-thanh-au-tinh .tl-text-aug { color: var(--ink-cream); border-right-color: var(--gold); opacity: 0.85; }
+[data-theme="light"] body.page-thanh-au-tinh .tl-major .tl-text-aug { color: var(--ink-cream); border-right-color: var(--gold-dim); opacity: 1; }
+/* Cột sự kiện thế giới — xanh thép nhạt, đủ tương phản */
+[data-theme="light"] body.page-thanh-au-tinh .tl-text-world { color: #2a4a70; border-left-color: #5880a8; }
+[data-theme="light"] body.page-thanh-au-tinh .tl-major .tl-text-world { color: #1e3a5c; border-left-color: #2e5888; }
+[data-theme="light"] body.page-thanh-au-tinh .tl-source { color: var(--ink-cream-soft); border-top-color: var(--deco-rule); }
+
+/* Drop cap — scoped to this page via body class */
+/* TOC Roman numeral override for this page */
+body.page-thanh-au-tinh .prose > p:first-of-type::first-letter {
+  float: left;
+  font-family: 'Noto Serif', 'Playfair Display', Georgia, serif;
+  font-size: 5.2em;
+  line-height: 0.80;
+  padding: 0.04em 0.12em 0 0;
+  color: var(--gold);
+  text-shadow: 0 0 28px rgba(233, 193, 118, 0.22);
+}
+body.page-thanh-au-tinh .toc a { font-size: 1.4rem; }
+</style>
+
+<style>
+/* ── Hero ────────────────────────────────────── */
+.aug-hero {
+  display: flex;
+  align-items: center;
+  gap: 4rem;
+  max-width: 92rem;
+  margin: 0 auto 3.6rem;
+  padding: 2rem 2rem 0;
+}
+.aug-hero-text { flex: 1; min-width: 0; }
+
+.aug-eyebrow {
+  /* lib-masthead-sub */
+  font-family: 'Montserrat', 'Manrope', system-ui, sans-serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: .4em;
+  text-transform: uppercase;
+  color: var(--deco-gem);
+  margin: 0 0 1.1rem;
+}
+.aug-name {
+  /* lib-masthead-title — gradient từ global h1 rule tự áp, chỉ đè font+size */
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: clamp(3rem, 4.5vw, 5.5rem);
+  font-weight: 700;
+  line-height: 1.15;
+  margin: 0 0 1rem;
+}
+.aug-latin {
+  /* lib-masthead-subtitle từ bio page */
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.75rem;
+  font-weight: 400;
+  color: var(--ink-cream-soft);
+  margin: 0 0 1.4rem;
+}
+.aug-rule {
+  /* lib-masthead-rule */
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+.aug-rule::before,
+.aug-rule::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--deco-rule), transparent);
+}
+.aug-rule-ornament {
+  color: var(--deco-gem);
+  font-size: 1.1rem;
+}
+.aug-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-bottom: 2rem;
+}
+.aug-dates {
+  font-family: var(--font-ui);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--gold);
+  letter-spacing: 0.04em;
+}
+.aug-sep { color: var(--deco-gem); font-size: 1.2rem; }
+.aug-feast {
+  font-family: var(--font-ui);
+  font-size: 1.4rem;
+  color: var(--ink-cream-soft);
+  margin-bottom: 0;
+}
+.aug-motto {
+  /* lib-masthead-desc */
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 1.6rem;
+  line-height: 1.7;
+  color: var(--deco-gem);
+  margin: 0;
+}
+.aug-motto cite {
+  display: block;
+  font-style: normal;
+  font-family: var(--font-ui);
+  font-size: 1.2rem;
+  margin-top: 0.5rem;
+  opacity: .75;
+}
+
+/* ── Portrait ───────────────────────────────── */
+.aug-portrait { flex-shrink: 0; text-align: center; }
+.aug-arch-frame {
+  width: clamp(14rem, 18vw, 20rem);
+  border-radius: 50% 50% 8px 8px / 38% 38% 8px 8px;
+  overflow: hidden;
+  border: 1px solid rgba(233,193,118,0.28);
+  box-shadow: 0 16px 52px rgba(0,0,0,0.55), 0 0 0 3px rgba(233,193,118,0.06);
+  transition: box-shadow 0.4s;
+}
+.aug-arch-frame:hover {
+  box-shadow: 0 20px 60px rgba(0,0,0,0.65), 0 0 0 3px rgba(233,193,118,0.14);
+}
+.aug-arch-frame img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  object-position: center top;
+  filter: saturate(0.88);
+  transition: filter 0.4s, transform 0.5s;
+}
+.aug-arch-frame:hover img { filter: saturate(1.05); transform: scale(1.03); }
+.aug-portrait figcaption {
+  font-family: var(--font-ui);
+  font-size: 1.2rem;
+  color: rgba(201,191,169,0.55);
+  margin-top: 0.9rem;
+  letter-spacing: 0.06em;
+}
+
+/* ── Tab bar ─────────────────────────────────── */
+.aug-tab-bar {
+  display: flex;
+  max-width: 92rem;
+  margin: 0 auto 3.2rem;
+  padding: 0 2rem;
+  border-bottom: 1px solid rgba(233,193,118,0.14);
+  gap: 0.4rem;
+}
+.aug-tab-btn {
+  font-family: var(--font-ui);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--ink-cream-soft);
+  background: none;
+  border: none;
+  padding: 1.2rem 2.6rem;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.2s;
+}
+.aug-tab-btn::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--gold);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.25s ease;
+}
+.aug-tab-btn.active { color: var(--ink-cream); }
+.aug-tab-btn.active::after { transform: scaleX(1); }
+.aug-tab-btn:hover:not(.active) { color: var(--ink-cream); }
+
+/* ── Panels ──────────────────────────────────── */
+.aug-panel[hidden] { display: none; }
+
+/* ── Source citation ─────────────────────────── */
+.tl-source {
+  max-width: 100rem;
+  margin: 0 auto;
+  padding: 2.4rem 2rem 4rem;
+  font-family: var(--font-body);
+  font-size: 1.35rem;
+  line-height: 1.7;
+  color: var(--ink-cream-soft);
+  border-top: 1px solid rgba(233,193,118,0.18);
+}
+/* light mode handled in is:global block */
+
+/* ── Era label ───────────────────────────────── */
+.tl-era {
+  display: flex;
+  align-items: center;
+  gap: 1.6rem;
+  max-width: 100rem;
+  margin: 3.2rem auto 1.6rem;
+  padding: 0 2rem;
+}
+.tl-era::before,
+.tl-era::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(233,193,118,0.12);
+}
+.tl-era span {
+  font-family: var(--font-ui);
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: rgba(233,193,118,0.4);
+  white-space: nowrap;
+}
+
+/* ── Timeline wrap ───────────────────────────── */
+.tl-wrap {
+  position: relative;
+  max-width: 100rem;
+  margin: 0 auto;
+  padding: 0 2rem 6rem;
+}
+
+/* ── Row ─────────────────────────────────────── */
+.tl-row {
+  display: grid;
+  grid-template-columns: 1fr 9rem 1fr;
+  align-items: start;
+  padding: 0.55rem 0;
+  gap: 0;
+}
+.tl-row[hidden] { display: none; }
+
+/* ── Center: node + year ─────────────────────── */
+.tl-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding-top: 0.2rem;
+  position: relative;
+  z-index: 1;
+}
+.tl-node {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  background: var(--bg-main);
+  border: 1.5px solid rgba(233,193,118,0.35);
+  flex-shrink: 0;
+  transition: border-color 0.2s;
+}
+.tl-node-major {
+  width: 1.1rem;
+  height: 1.1rem;
+  background: var(--gold);
+  border-color: var(--gold);
+  box-shadow: 0 0 10px rgba(233,193,118,0.45);
+}
+.tl-year {
+  font-family: var(--font-ui);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: rgba(201,191,169,0.65);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.tl-major .tl-year {
+  color: var(--gold);
+  font-size: 1.35rem;
+}
+
+/* ── Event sides ─────────────────────────────── */
+.tl-side { padding: 0 1.8rem; }
+.tl-left { text-align: right; }
+.tl-right { text-align: left; }
+.tl-side[hidden] { visibility: hidden; }
+
+.tl-text {
+  font-family: var(--font-body);
+  font-size: 1.55rem;
+  line-height: 1.75;
+  margin: 0;
+  padding: 0.1rem 0 0.8rem;
+}
+.tl-text-aug {
+  color: var(--ink-cream-soft);
+  border-right: 2px solid rgba(233,193,118,0.2);
+  padding-right: 1.4rem;
+}
+.tl-major .tl-text-aug {
+  color: var(--ink-cream);
+  border-right-color: rgba(233,193,118,0.45);
+}
+.tl-text-world {
+  color: rgba(123,167,188,0.75);
+  border-left: 2px solid rgba(123,167,188,0.2);
+  padding-left: 1.4rem;
+}
+.tl-major .tl-text-world {
+  color: #7ba7bc;
+  border-left-color: rgba(123,167,188,0.4);
+}
+
+/* ── Light mode hero — chuyển sang <style is:global> bên dưới để tránh Astro
+   scope nhầm [data-theme="light"] (html không mang cid → rule không áp dụng) ── */
+
+/* ── Mobile ──────────────────────────────────── */
+@media (max-width: 640px) {
+  .aug-hero { flex-direction: column-reverse; gap: 2rem; padding-top: 1rem; }
+  .aug-arch-frame { width: clamp(12rem, 50vw, 16rem); }
+  .aug-name { font-size: 2.8rem; }
+  .tl-col-headers { display: none; }
+  .tl-row {
+    grid-template-columns: 6rem 1fr;
+    grid-template-areas: 'center aug' 'center world';
+  }
+  .tl-left { grid-area: world; text-align: left; padding: 0; }
+  .tl-center { grid-area: center; }
+  .tl-right { grid-area: aug; padding: 0; }
+  .tl-text-aug { border-right: none; padding-right: 0; border-left: 2px solid rgba(233,193,118,0.2); padding-left: 1rem; }
+  .tl-major .tl-text-aug { border-left-color: rgba(233,193,118,0.45); }
+}
+</style>
+
+<script define:vars={{ phJson: taPh }}>
+document.getElementById('backBtn')?.remove();
+
+// Tab switching
+const tabBtns = document.querySelectorAll('.aug-tab-btn');
+const panels = document.querySelectorAll('.aug-panel');
+
+tabBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    tabBtns.forEach(b => {
+      b.classList.remove('active');
+      b.setAttribute('aria-selected', 'false');
+    });
+    panels.forEach(p => { p.hidden = true; });
+    btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
+    const panel = document.getElementById(`panel-${tab}`);
+    if (panel) panel.hidden = false;
+  });
+});
+
+// ── Inline edit ───────────────────────────────────────────────────
+const ADMIN = 'http://localhost:4322';
+const oeBar      = document.getElementById('oe-bar');
+const oeEditBtn  = document.getElementById('oe-edit-btn');
+const oeSaveRow  = document.getElementById('oe-save-row');
+const oeCancelBtn = document.getElementById('oe-cancel-btn');
+const oeSaveBtn   = document.getElementById('oe-save-btn');
+const oeMsg       = document.getElementById('oe-msg');
+
+fetch(ADMIN + '/api/page-headers').then(r => {
+  if (r.ok && oeBar) oeBar.removeAttribute('hidden');
+}).catch(() => {});
+
+let editing = false;
+
+function enterEditMode() {
+  editing = true;
+  document.body.classList.add('oe-editing');
+  document.querySelectorAll('[data-oe]').forEach(el => {
+    el.setAttribute('contenteditable', 'true');
+    el.dataset.oeOrig = el.dataset.oeHtml ? el.innerHTML : el.textContent;
+  });
+  oeEditBtn?.setAttribute('hidden', '');
+  oeSaveRow?.removeAttribute('hidden');
+  if (oeMsg) oeMsg.textContent = '';
+}
+
+function exitEditMode() {
+  editing = false;
+  document.body.classList.remove('oe-editing');
+  document.querySelectorAll('[data-oe]').forEach(el => el.removeAttribute('contenteditable'));
+  oeEditBtn?.removeAttribute('hidden');
+  oeSaveRow?.setAttribute('hidden', '');
+}
+
+function cancelEdit() {
+  document.querySelectorAll('[data-oe]').forEach(el => {
+    const orig = el.dataset.oeOrig;
+    if (orig !== undefined) {
+      if (el.dataset.oeHtml) el.innerHTML = orig;
+      else el.textContent = orig;
+    }
+  });
+  exitEditMode();
+}
+
+async function saveEdit() {
+  if (oeMsg) oeMsg.textContent = 'Đang lưu…';
+  const data = Object.assign({}, phJson);
+  document.querySelectorAll('[data-oe-target="ph"][data-oe]').forEach(el => {
+    data[el.dataset.oe] = el.dataset.oeHtml ? el.innerHTML.trim() : el.textContent.trim();
+  });
+  try {
+    const r = await fetch(ADMIN + '/api/page-headers/thanh-au-tinh', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (r.ok) { if (oeMsg) oeMsg.textContent = 'Đã lưu!'; setTimeout(exitEditMode, 900); }
+    else if (oeMsg) oeMsg.textContent = 'Lỗi khi lưu';
+  } catch { if (oeMsg) oeMsg.textContent = 'Không kết nối được admin server'; }
+}
+
+oeEditBtn  ?.addEventListener('click', enterEditMode);
+oeCancelBtn?.addEventListener('click', cancelEdit);
+oeSaveBtn  ?.addEventListener('click', saveEdit);
+
+</script>

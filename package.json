@@ -1,0 +1,27 @@
+{
+  "name": "augusinh",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "astro dev",
+    "admin": "node scripts/admin-server.mjs",
+    "build": "astro build",
+    "build:tu-thuat": "node scripts/build-single-page.mjs",
+    "preview": "astro preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@astrojs/mdx": "^4.3.14",
+    "@astrojs/sitemap": "^3.7.3",
+    "astro": "^5.18.2",
+    "sharp": "^0.35.2"
+  },
+  "devDependencies": {
+    "playwright": "^1.61.1"
+  }
+}

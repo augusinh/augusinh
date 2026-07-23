@@ -1,0 +1,131 @@
+---
+import { getCollection, render } from 'astro:content';
+import { getImage } from 'astro:assets';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import TableOfContents from '../../components/TableOfContents.astro';
+
+export async function getStaticPaths() {
+  const articles = await getCollection('bai-viet', ({ data }) => !data.draft);
+  const sorted = [...articles].sort((a, b) => (b.data.date?.getTime() ?? 0) - (a.data.date?.getTime() ?? 0));
+
+  return sorted.map((entry) => {
+    const related = sorted
+      .filter((article) => article.id !== entry.id && article.data.category === entry.data.category)
+      .slice(0, 3)
+      .map((article) => ({
+        href: `/bai-viet/${article.id}/`,
+        title: article.data.title,
+        excerpt: article.data.excerpt ?? '',
+        author: article.data.author ?? '',
+        date: article.data.date,
+        category: article.data.category ?? '',
+      }));
+    const sameCategory = sorted.filter((article) => article.data.category === entry.data.category);
+    const index = sameCategory.findIndex((article) => article.id === entry.id);
+    const toLink = (article: typeof entry | undefined) => article
+      ? { href: `/bai-viet/${article.id}/`, title: article.data.title }
+      : null;
+    return {
+      params: { slug: entry.id },
+      props: { entry, related, newer: toLink(sameCategory[index - 1]), older: toLink(sameCategory[index + 1]) },
+    };
+  });
+}
+
+const { entry, related, newer, older } = Astro.props;
+const { Content, headings } = await render(entry);
+const d = entry.data;
+const dateStr = d.date ? `Ngày ${d.date.getDate()} tháng ${d.date.getMonth() + 1}, ${d.date.getFullYear()}` : '';
+const hasToc = headings.filter((heading) => heading.depth === 2 || heading.depth === 3).length > 2;
+const folder = entry.id.split('/')[0];
+const formatDate = (date?: Date) => date ? `Tháng ${date.getMonth() + 1}, ${date.getFullYear()}` : '';
+const heroSource = d.heroImage ?? d.image;
+let heroSrc = '';
+if (heroSource) {
+  try { heroSrc = (await getImage({ src: heroSource, width: 1760, height: 900 })).src; } catch {}
+}
+---
+
+<BaseLayout title={d.title} description={d.excerpt} image={d.heroImage?.src ?? d.image?.src} type="article" bodyClass="page-articles no-sidebar" banner={null}>
+  <div slot="full-bleed" class="art-hero article-header" data-cat={folder}>
+    <div class="art-hero-bg">
+      {heroSrc ? <img src={heroSrc} alt="" /> : <div class="art-hero-fallback"></div>}
+    </div>
+    <div class="art-hero-scrim" aria-hidden="true"></div>
+    <div class="art-hero-inner">
+      <a class="art-hero-back" href="/bai-viet/">← <span>Bài Viết</span></a>
+      <div class="art-hero-text">
+        {d.category && <a class="art-hero-cat" href={`/bai-viet/?category=${folder}`} data-cat={folder}>{d.category}</a>}
+        <h1 class="art-hero-title">{d.title}</h1>
+        {d.subtitle && <p class="art-hero-sub">{d.subtitle}</p>}
+        {(d.author || dateStr) && <p class="art-hero-meta">{d.author}{d.author && dateStr ? ' · ' : ''}{dateStr}</p>}
+      </div>
+    </div>
+  </div>
+
+  <div class={`article-shell ${hasToc ? 'has-toc toc-open' : ''}`}>
+    {hasToc && <TableOfContents headings={headings} />}
+    <article class="prose"><Content /></article>
+  </div>
+
+  {(newer || older) && (
+    <nav class="art-nav" aria-label="Bài trước và bài sau">
+      {newer ? <a class="art-nav-link art-nav-prev" href={newer.href}><span class="art-nav-dir">← Bài mới hơn</span><span class="art-nav-title">{newer.title}</span></a> : <span class="art-nav-spacer" />}
+      {older ? <a class="art-nav-link art-nav-next" href={older.href}><span class="art-nav-dir">Bài cũ hơn →</span><span class="art-nav-title">{older.title}</span></a> : <span class="art-nav-spacer" />}
+    </nav>
+  )}
+
+  {related.length > 0 && (
+    <section class="art-related" aria-label="Bài viết liên quan">
+      <div class="art-related-head"><span class="art-related-orn" aria-hidden="true">✦</span><p class="art-related-eyebrow">Đọc thêm</p><h2 class="art-related-hd">Bài Viết Liên Quan</h2></div>
+      <ul class="art-related-list">
+        {related.map((article) => (
+          <li class="art-rel-item">
+            <a class="art-rel-link" href={article.href}>
+              <div class="art-rel-body">
+                {article.category && <span class="art-rel-cat">{article.category}</span>}
+                <h3 class="art-rel-title">{article.title}</h3>
+                {article.excerpt && <p class="art-rel-excerpt">{article.excerpt}</p>}
+                <span class="art-rel-meta">{article.author}{article.author && article.date ? ' · ' : ''}{formatDate(article.date)}</span>
+              </div>
+              <span class="art-rel-arrow" aria-hidden="true">→</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+</BaseLayout>
+
+<script>
+  document.getElementById('backBtn')?.remove();
+
+  document.querySelectorAll<HTMLTableElement>('.prose table').forEach((table) => {
+    if (table.parentElement?.classList.contains('prose-table-wrap')) return;
+    const wrapper = document.createElement('div');
+    wrapper.className = 'prose-table-wrap';
+    table.replaceWith(wrapper);
+    wrapper.appendChild(table);
+  });
+
+  document.querySelectorAll<HTMLQuoteElement>('.prose blockquote').forEach((quote) => {
+    quote.querySelectorAll<HTMLParagraphElement>(':scope > p').forEach((paragraph) => {
+      if (/^\s*[—–]\s/.test(paragraph.textContent ?? '')) paragraph.classList.add('bq-cite');
+    });
+  });
+
+  document.querySelectorAll<HTMLElement>('.prose h2[id], .prose h3[id]').forEach((heading) => {
+    if (heading.closest('.footnotes')) return;
+    const anchor = document.createElement('a');
+    anchor.className = 'heading-anchor';
+    anchor.href = '#' + heading.id;
+    anchor.setAttribute('aria-label', 'Liên kết tới mục');
+    anchor.textContent = '#';
+    anchor.addEventListener('click', (event) => {
+      event.preventDefault();
+      history.replaceState(null, '', '#' + heading.id);
+      heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    heading.appendChild(anchor);
+  });
+</script>

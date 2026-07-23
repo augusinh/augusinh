@@ -1,0 +1,20 @@
+---
+import { Image } from 'astro:assets';
+const { href, title, category, excerpt, author, date, image } = Astro.props;
+const dateStr = date ? `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}` : '';
+const CAT_SLUG = { 'Thần Học': 'than-hoc', 'Triết Học': 'triet-hoc', 'Linh Đạo': 'linh-dao' };
+const catSlug = category ? (CAT_SLUG[category] ?? '') : '';
+---
+<a href={href} class="article-card" data-cat={catSlug}>
+  {image && <Image src={image} alt={title} class="article-card-image" width={440} height={248} />}
+  <div class="article-card-content">
+    {category && <span class="article-card-category" data-cat={catSlug}>{category}</span>}
+    <h3 class="article-card-title">{title}</h3>
+    <div class="article-card-meta">
+      {author && <span>{author}</span>}
+      {author && dateStr && <span class="meta-separator">·</span>}
+      {dateStr && <span>{dateStr}</span>}
+    </div>
+    {excerpt && <p class="article-card-summary">{excerpt}</p>}
+  </div>
+</a>

@@ -1,0 +1,141 @@
+---
+import { getCollection, render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import TableOfContents from '../../components/TableOfContents.astro';
+
+export async function getStaticPaths() {
+  // Tự Thuật có trang riêng /tu-thuat (entry sách chỉ dùng làm metadata) → không sinh route reader ở đây
+  const books = await getCollection('sach', ({ data }) => !data.draft);
+  return books
+    .filter((entry) => entry.id !== 'st-augustine/tu-thuat')
+    .map((entry) => ({ params: { slug: entry.id }, props: { entry } }));
+}
+const { entry } = Astro.props;
+const { Content, headings } = await render(entry);
+const d = entry.data;
+const tocHeadings = headings.filter((h) => h.depth === 2 || h.depth === 3);
+const hasToc = tocHeadings.length > 1;
+---
+<BaseLayout title={d.title} description={d.excerpt} image={d.image?.src}
+  type="article" bodyClass="page-reader no-sidebar" banner="reader">
+  <a href="/thu-vien/" class="back-to-lib">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    Thư Viện
+  </a>
+  <header class="lib-masthead">
+    {d.subtitle && <p class="lib-masthead-sub">{d.subtitle}</p>}
+    <h1 class="lib-masthead-title">{d.title}</h1>
+    <div class="lib-masthead-rule"><span class="lib-masthead-ornament">✦</span></div>
+    {(d.translator || d.publishYear) && (
+      <p class="lib-masthead-article-meta">
+        {d.translator && <span>Dịch: {d.translator}</span>}
+        {d.translator && d.publishYear ? ' · ' : ''}{d.publishYear}
+      </p>
+    )}
+  </header>
+  <div class={`article-shell ${hasToc ? 'has-toc toc-open' : ''}`}>
+    {hasToc && <TableOfContents headings={headings} />}
+    <article class="prose"><Content /></article>
+  </div>
+
+  {hasToc && (
+    <div id="bookFloatToc">
+      <div id="bftPanel">
+        <p class="ffp-label">Mục Lục</p>
+        <nav id="bftNav" aria-label="Mục lục nhanh">
+          {tocHeadings.map((h) => (
+            <a
+              href={`#${h.slug}`}
+              class={`bft-link bft-depth-${h.depth}`}
+              data-slug={h.slug}
+            >
+              {h.text}
+            </a>
+          ))}
+        </nav>
+      </div>
+      <button id="bftBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Mục lục">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="16" y2="12"/>
+          <line x1="3" y1="18" x2="11" y2="18"/>
+        </svg>
+        <span id="bftLabel">Mục Lục</span>
+      </button>
+    </div>
+  )}
+</BaseLayout>
+
+<script>
+// ---- Số đoạn ----
+document.querySelectorAll<HTMLParagraphElement>('.prose p').forEach((p) => {
+  if (p.closest('.footnotes')) return;
+  const walker = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+  const first = walker.nextNode() as Text | null;
+  if (!first) return;
+  const m = first.textContent?.match(/^(\d+\.?\s)/);
+  if (!m) return;
+  const span = document.createElement('span');
+  span.className = 'article-num';
+  span.textContent = m[1];
+  const rest = document.createTextNode((first.textContent ?? '').slice(m[1].length));
+  first.parentNode?.replaceChild(span, first);
+  span.after(rest);
+});
+
+// Điều hướng footnote (offset nav + highlight 2 chiều) đã chuyển sang BaseLayout — dùng chung toàn site.
+
+// ---- Floating TOC ----
+(function () {
+  const widget = document.getElementById('bookFloatToc');
+  if (!widget) return;
+
+  const panel = document.getElementById('bftPanel') as HTMLElement;
+  const btn   = document.getElementById('bftBtn') as HTMLButtonElement;
+  const label = document.getElementById('bftLabel') as HTMLElement;
+  const links = widget.querySelectorAll<HTMLAnchorElement>('.bft-link');
+
+  document.getElementById('backBtn')?.remove();
+
+  function openPanel(open: boolean) {
+    panel.classList.toggle('open', open);
+    btn.setAttribute('aria-expanded', String(open));
+    if (open) {
+      const active = panel.querySelector<HTMLElement>('.bft-link.active');
+      active?.scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  btn.addEventListener('click', () => openPanel(!panel.classList.contains('open')));
+
+  document.addEventListener('click', (e) => {
+    if (!widget.contains(e.target as Node)) openPanel(false);
+  }, { capture: true });
+
+  links.forEach((link) => link.addEventListener('click', () => openPanel(false)));
+
+  window.addEventListener('scroll', () => {
+    widget.classList.toggle('show', window.scrollY > 300);
+  });
+
+  // IntersectionObserver — active link + label hiện tên chương
+  const slugMap = new Map<string, HTMLAnchorElement>();
+  links.forEach((l) => { if (l.dataset.slug) slugMap.set(l.dataset.slug, l); });
+
+  if (slugMap.size > 0) {
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (!e.isIntersecting) return;
+        links.forEach((l) => l.classList.remove('active'));
+        const link = slugMap.get(e.target.id);
+        if (link) {
+          link.classList.add('active');
+          const text = link.textContent?.trim() ?? '';
+          label.textContent = text.length > 22 ? text.slice(0, 22) + '…' : text;
+        }
+      });
+    }, { rootMargin: '-80px 0px -70% 0px' });
+    slugMap.forEach((_, id) => { const el = document.getElementById(id); if (el) obs.observe(el); });
+  }
+})();
+</script>

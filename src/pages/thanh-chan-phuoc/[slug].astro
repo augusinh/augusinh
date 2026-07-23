@@ -1,0 +1,133 @@
+---
+import { getCollection, render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import TableOfContents from '../../components/TableOfContents.astro';
+
+export async function getStaticPaths() {
+  const entries = await getCollection('thanh-chan-phuoc', e => !e.data.draft);
+  return entries.map(entry => ({
+    params: { slug: entry.id },
+    props: { entry },
+  }));
+}
+
+const { entry } = Astro.props;
+const { Content, headings } = await render(entry);
+const hasToc = headings.filter((h) => h.depth === 2 || h.depth === 3).length > 1;
+
+const RANK_LABEL: Record<string, string> = {
+  solemn:   'Lễ Trọng',
+  feast:    'Lễ Kính',
+  memorial: 'Lễ Nhớ',
+  none:     '',
+};
+const { title, subtitle, rank, feastDay, feastMonth, imageFile } = entry.data;
+const rankLabel = RANK_LABEL[rank] || '';
+const feastStr  = feastDay && feastMonth
+  ? `${String(feastDay).padStart(2, '0')}-${String(feastMonth).padStart(2, '0')}`
+  : '';
+---
+<BaseLayout
+  title={title}
+  banner="saints"
+  bodyClass="no-sidebar"
+  type="article"
+  description={`Tiểu sử ${title} — Dòng Augustinô`}
+  image={imageFile || undefined}
+>
+
+<div class="bio-masthead">
+  <PageHeader title={title} subtitle={subtitle} desc={feastStr}>
+    {rankLabel && <span slot="sub" class={`rank-badge rank-${rank}`}>{rankLabel}</span>}
+  </PageHeader>
+</div>
+
+{imageFile && (
+  <figure class="bio-fig">
+    <img src={imageFile} alt={title} class="bio-img" loading="eager" decoding="async" />
+  </figure>
+)}
+
+<div class={`article-shell ${hasToc ? 'has-toc toc-open' : ''}`}>
+  {hasToc && <TableOfContents headings={headings} />}
+  <article class="prose"><Content /></article>
+</div>
+
+<script>
+  // Dòng nguồn trong blockquote dùng cùng kiểu prose với các trang bài viết.
+  document.querySelectorAll<HTMLQuoteElement>('.prose blockquote').forEach((quote) => {
+    quote.querySelectorAll<HTMLParagraphElement>(':scope > p').forEach((paragraph) => {
+      if (/^\s*[—–]\s/.test(paragraph.textContent ?? '')) {
+        paragraph.classList.add('bq-cite');
+      }
+    });
+  });
+</script>
+
+<style>
+/* Bio dùng master lib header (PageHeader). Tên thánh thường dài hơn tên
+   tài liệu → thu nhỏ h1 cho phù hợp. */
+.bio-masthead :global(.lib-masthead-title) {
+  font-size: clamp(2.8rem, 5.5vw, 4.4rem);
+  line-height: 1.25;
+}
+/* Danh hiệu/chức vụ thánh (subtitle) — dưới tên, trên ngày lễ */
+.bio-masthead :global(.lib-masthead-subtitle) {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-style: italic;
+  font-weight: 400;
+  color: var(--ink-cream-soft);
+  margin: 0.6rem 0 0;
+  line-height: 1.4;
+}
+
+/* Ngày lễ (desc) — nổi bật: gold, đậm, không mờ, dấu ✦ hai bên */
+.bio-masthead :global(.lib-masthead-desc) {
+  font-family: var(--font-ui);
+  font-size: 1.7rem;
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--gold);
+  opacity: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+.bio-masthead :global(.lib-masthead-desc)::before,
+.bio-masthead :global(.lib-masthead-desc)::after {
+  content: '✦';
+  font-size: 1rem;
+  color: rgba(233,193,118,.55);
+}
+
+/* Chân dung thánh — khung trang trọng, đặt dưới header */
+.bio-fig {
+  display: block;
+  width: min(28rem, 72%);
+  margin: 0 auto 3.2rem;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(233,193,118,.3);
+  box-shadow: 0 14px 44px rgba(0,0,0,.5), inset 0 0 0 1px rgba(233,193,118,.1);
+  background: var(--bg-card);
+}
+.bio-img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  object-position: center top;
+  filter: saturate(.92);
+  transition: filter .3s, transform .5s;
+}
+.bio-fig:hover .bio-img { filter: saturate(1); transform: scale(1.03); }
+
+@media (max-width: 480px) {
+  .bio-fig { width: min(22rem, 82%); }
+}
+</style>
+
+</BaseLayout>

@@ -1,0 +1,16 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import pageHeaders from '../../data/page-headers.json';
+const ph = (pageHeaders as Record<string, Record<string, string>>)['thu-vien'];
+---
+
+<BaseLayout title={ph.title} banner="thu-vien" bodyClass="no-sidebar">
+<div class="lib-wrap">
+  <PageHeader
+    title={ph.title}
+    sub={ph.sub}
+    desc={ph.desc}
+  />
+</div>
+</BaseLayout>

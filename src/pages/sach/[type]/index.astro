@@ -1,0 +1,111 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import PageHeader from '../../../components/PageHeader.astro';
+
+export async function getStaticPaths() {
+  const all = await getCollection('sach', ({ data }) => !data.draft);
+  const TYPES = {
+    'thieng-lieng': { label: 'Sách Thiêng Liêng', bookType: 'spiritual',
+      tagline: 'Kho tàng linh đạo và thần học Công giáo' },
+    'triet-hoc': { label: 'Sách Triết Học', bookType: 'philosophy',
+      tagline: 'Những tác phẩm triết học nền tảng' },
+  };
+  return Object.entries(TYPES).map(([slug, cfg]) => {
+    const books = all.filter((b) => b.data.bookType === cfg.bookType);
+    const byAuthor = new Map();
+    for (const b of books) {
+      const a = b.data.author ?? 'Khác';
+      if (!byAuthor.has(a)) byAuthor.set(a, []);
+      byAuthor.get(a).push(b);
+    }
+    const authors = [...byAuthor.entries()].map(([name, list]) => ({
+      name, books: list.sort((x, y) => (x.data.order ?? 0) - (y.data.order ?? 0)),
+    }));
+    const flat = books.map((b) => ({ id: b.id, title: b.data.title, author: b.data.author ?? 'Khác' }));
+    return { params: { type: slug }, props: { ...cfg, authors, flat } };
+  });
+}
+const { label, tagline, authors, flat } = Astro.props;
+---
+<BaseLayout title={label} bodyClass="no-sidebar" banner="reader">
+  <div class="listing">
+    <PageHeader
+      title={label}
+      sub="Bibliotheca Augustiniana"
+      desc={tagline}
+    />
+
+    <!-- Thanh công cụ: tìm nhanh + chọn tác giả (function giữ nguyên) -->
+    <div class="listing-toolbar">
+      <div class="search-box">
+        <input type="search" id="bookSearch" placeholder="Tìm theo tên sách hoặc tác giả..." />
+      </div>
+      <select id="authorFilter" aria-label="Lọc theo tác giả">
+        <option value="all">Tất cả tác giả</option>
+        {authors.map((a) => <option value={a.name}>{a.name}</option>)}
+      </select>
+    </div>
+
+    <p class="listing-count" id="count"></p>
+
+    <div id="bookGroups">
+      {authors.map((author) => (
+        <section class="author-block" data-author={author.name}>
+          <h2 class="author-block-title">{author.name}</h2>
+          <ul class="entry-list">
+            {author.books.map((b) => (
+              <li class="entry-item" data-title={b.data.title.toLowerCase()} data-author={author.name.toLowerCase()}>
+                <a class="entry-link" href={`/sach/${b.id}/`}>
+                  <p class="entry-title">{b.data.title}</p>
+                  <div class="entry-meta">
+                    {b.data.subtitle && <span class="excerpt">{b.data.subtitle}</span>}
+                    {b.data.subtitle && b.data.translator && <span class="sep">·</span>}
+                    {b.data.translator && <span>Dịch: {b.data.translator}</span>}
+                    {b.data.publishYear && <span class="sep">·</span>}
+                    {b.data.publishYear && <span>{b.data.publishYear}</span>}
+                  </div>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+    <p class="entry-empty" id="noResult" style="display:none;">Không tìm thấy sách nào phù hợp.</p>
+  </div>
+
+  <script>
+    const search = document.getElementById('bookSearch');
+    const filter = document.getElementById('authorFilter');
+    const groups = [...document.querySelectorAll('.author-block')];
+    const noResult = document.getElementById('noResult');
+    const count = document.getElementById('count');
+
+    function totalVisible() {
+      return document.querySelectorAll('.entry-item:not([data-hidden])').length;
+    }
+
+    function apply() {
+      const term = (search.value || '').toLowerCase().trim();
+      const author = filter.value;
+      let visible = 0;
+      groups.forEach((g) => {
+        const matchAuthor = author === 'all' || g.dataset.author === author;
+        let groupHas = false;
+        g.querySelectorAll('.entry-item').forEach((it) => {
+          const hit = matchAuthor &&
+            (!term || it.dataset.title.includes(term) || it.dataset.author.includes(term));
+          if (hit) { it.removeAttribute('data-hidden'); it.style.display = ''; groupHas = true; visible++; }
+          else { it.setAttribute('data-hidden',''); it.style.display = 'none'; }
+        });
+        g.style.display = groupHas ? '' : 'none';
+      });
+      noResult.style.display = visible ? 'none' : 'block';
+      count.textContent = visible ? `${visible} tác phẩm` : '';
+    }
+    search.addEventListener('input', apply);
+    filter.addEventListener('change', apply);
+    apply();
+  </script>
+</BaseLayout>
